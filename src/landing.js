@@ -316,9 +316,26 @@ function atualizarLicencaDisplay(lic) {
   elLicenca.textContent = texto;
 }
 
+async function consumirDownload() {
+  const token = getToken(); const s = getSistema();
+  if (!token || !s) { alert('Inicie sessão.'); return false; }
+  try {
+    const r = await fetch('/api/licencas/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ sistemaSlug: s.slug })
+    });
+    const d = await r.json();
+    if (d.licenca) atualizarLicencaDisplay(d.licenca);
+    if (!r.ok) { alert(d.error || 'Limite atingido'); return false; }
+    return true;
+  } catch(e) { alert('Erro: ' + e.message); return false; }
+}
+
 // Exporta a resposta atual como PDF (usa o diálogo de impressão do navegador)
-function baixarPDF() {
+async function baixarPDF() {
   if (!elResp.innerHTML) { alert('Ainda não há resultados para exportar.'); return; }
+  if (!await consumirDownload()) return;
   const s = getSistema();
   const cab = document.getElementById('pdf-header');
   const usr = SESSAO?.usuario, ten = SESSAO?.farmacia;
@@ -349,7 +366,8 @@ function toCSV(linhas) {
 }
 
 // Exporta os resultados em Excel/CSV (separador ; para abrir direto no Excel pt)
-function baixarExcel() {
+async function baixarExcel() {
+  if (!await consumirDownload()) return;
   const arr = arraysDaResposta();
   if (!arr.length) { alert('Não há tabelas de dados para exportar.'); return; }
   const nome = (getSistema()?.nome || 'dados').replace(/\\s+/g, '_') + '_' + (ULTIMA_RESPOSTA?.query || 'consulta').replace(/[^\\w\\d]+/g, '_').slice(0, 30) + '.csv';
@@ -380,8 +398,9 @@ function textoResumo() {
 }
 
 // Partilha a resposta por WhatsApp
-function partilharWhatsapp() {
+async function partilharWhatsapp() {
   if (!ULTIMA_RESPOSTA) { alert('Ainda não há resultados para partilhar.'); return; }
+  if (!await consumirDownload()) return;
   const texto = encodeURIComponent(textoResumo());
   window.open('https://wa.me/?text=' + texto, '_blank');
 }
@@ -413,8 +432,9 @@ function mostrarInsights() {
   elResp.appendChild(box);
 }
 
-function baixarInsights() {
+async function baixarInsights() {
   if (!ULTIMA_RESPOSTA) return;
+  if (!await consumirDownload()) return;
   const corpo = textoResumo();
   const blob = new Blob(['📊 Business Insights — ' + (getSistema()?.nome || '') + '\\n\\n' + corpo], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');

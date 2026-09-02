@@ -14,6 +14,7 @@ import machambaRouter from './modules/machamba/routes.js';
 import smartschoolRouter from './modules/smartschool/routes.js';
 import brokerhubRouter from './modules/brokerhub/routes.js';
 import entregasRouter from './modules/entregas/routes.js';
+import licencaRouter from './licencas/routes.js';
 
 // TECNOINCUBADORA AI — motor central, um módulo por SaaS
 // Este ficheiro monta o app Express e exporta-o (sem listen) para poder
@@ -26,6 +27,7 @@ app.use(express.static('public'));
 
 // Catálogo de sistemas + login separado por sistema
 app.use('/api/sistemas', sistemasRouter);
+app.use('/api/licencas', licencaRouter);
 
 // Módulo GestorFarma
 app.use('/api/farmacia', farmaciaRouter);
