@@ -15,6 +15,8 @@ import smartschoolRouter from './modules/smartschool/routes.js';
 import brokerhubRouter from './modules/brokerhub/routes.js';
 import entregasRouter from './modules/entregas/routes.js';
 import licencaRouter from './licencas/routes.js';
+import auditoriaRouter from './auditoria/routes.js';
+import feedbackRouter from './feedback/routes.js';
 
 // TECNOINCUBADORA AI — motor central, um módulo por SaaS
 // Este ficheiro monta o app Express e exporta-o (sem listen) para poder
@@ -28,6 +30,8 @@ app.use(express.static('public'));
 // Catálogo de sistemas + login separado por sistema
 app.use('/api/sistemas', sistemasRouter);
 app.use('/api/licencas', licencaRouter);
+app.use('/api/auditoria', auditoriaRouter);
+app.use('/api/feedback', feedbackRouter);
 
 // Módulo GestorFarma
 app.use('/api/farmacia', farmaciaRouter);

@@ -547,7 +547,8 @@ async function perguntar() {
     ULTIMA_RESPOSTA = { blocos: d.blocos, produtos: d.produtos, sistema: getSistema(), query };
     const temRel = d.blocos.length > 0, temProd = d.total_produtos > 0;
     elModo.className = '';
-    if (d.modo === 'interno') { elModo.style.display = 'block'; elModo.className = ''; elModo.textContent = '⚙ Motor interno — a responder com os recursos próprios.'; }
+    if (d.modo === 'cache') { elModo.style.display = 'block'; elModo.className = 'off'; elModo.textContent = '⚡ Cache — resposta instantânea (memorizada).'; }
+    else if (d.modo === 'interno') { elModo.style.display = 'block'; elModo.className = ''; elModo.textContent = '⚙ Motor interno — a responder com os recursos próprios.'; }
     else if (d.modo === 'externo') { elModo.style.display = 'block'; elModo.className = 'off'; elModo.textContent = '🧠 Assistido por IA externa.'; }
     else elModo.style.display = 'none';
     elEstado.textContent = temRel || temProd
