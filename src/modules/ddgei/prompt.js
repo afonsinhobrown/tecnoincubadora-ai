@@ -35,6 +35,7 @@ export const PROMPT_DDGEI = {
     tipos_material: 'tipos de material eleitoral',
     movimento_material: 'movimentos de material eleitoral entre locais',
     material_sobrante: 'material sobrante (bom/mau) por local',
+    relatorios: 'relatório tipo dashboard: inventário, entradas/saídas, movimentos e estatísticas (por equipamento, origem e marca)',
     buscar_equipamento: 'busca de equipamentos por nome/marca/série'
   },
 
@@ -122,6 +123,13 @@ export const PROMPT_DDGEI = {
       titulo: '🔁 Movimento de material',
       frases: ['movimento de material', 'material enviado', 'material entre locais'],
       palavras: ['movimento de material', 'material enviado', 'movimento material']
+    },
+    {
+      id: 'relatorios',
+      ferramenta: 'relatorios',
+      titulo: '📊 Relatórios',
+      frases: ['relatório de movimentos', 'relatório de inventário', 'entradas e saídas', 'relatório do dashboard', 'estatísticas de equipamentos'],
+      palavras: ['relatório', 'relatorio', 'entradas e saídas', 'entradas e saidas', 'estatísticas', 'estatisticas', 'dashboard']
     }
   ],
 

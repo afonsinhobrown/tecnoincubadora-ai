@@ -164,6 +164,50 @@ async function buscarEquipamento(termos) {
   `, [t]);
 }
 
+// Relatório tipo dashboard STAE (replica /relatorios sobre a BD)
+async function relatorios({ consulta, abas = ['inventario', 'movimentos'] } = {}) {
+  const c = extrairCriterio(consulta || '', [
+    { rotulo: 'entradas e saídas', rotuloCurto: 'entradas', valor: 'entradas_saidas' },
+    { rotulo: 'entradas saídas', rotuloCurto: 'entradas', valor: 'entradas_saidas' },
+    { rotulo: 'movimentos', rotuloCurto: 'movimentos', valor: 'movimentos' },
+    { rotulo: 'inventário', rotuloCurto: 'inventario', valor: 'inventario' }
+  ].map(d => ({ rotulo: d.rotulo, rotuloCurto: d.rotuloCurto, valor: d.valor })));
+  const abasFinal = c.global ? ['inventario', 'movimentos'] : [c.criterio.valor];
+
+  const out = {};
+  if (abasFinal.includes('inventario')) {
+    out.inventario = await sql(`
+      SELECT i.equipamento AS equipamento, coalesce(i.marca,'—') AS marca, i.numero_serie AS numero_serie,
+             coalesce(i.quantidade,1) AS quantidade, i.status AS estado, coalesce(s.nome,'—') AS setor
+      FROM inventario_local i LEFT JOIN setores s ON s.id = i.setor_id
+      WHERE i.status <> 'Pendente' ORDER BY i.id DESC
+    `);
+  }
+  if (abasFinal.includes('movimentos') || abasFinal.includes('entradas_saidas')) {
+    const where = abasFinal.includes('entradas_saidas') ? " AND m.tipo IN ('ENTRADA','SAIDA')" : '';
+    out.movimentos = await sql(`
+      SELECT m.guia, m.tipo, m.equipamento, coalesce(m.marca,'—') AS marca, m.numero_serie AS numero_serie,
+             m.origem_destino, m.quantidade, m.data, m.status, m.tecnico, m.motivo
+      FROM movimentos m WHERE 1=1${where} ORDER BY m.id DESC
+    `);
+  }
+  // Estatísticas (gráficos)
+  const stat_equip = await sql(`
+    SELECT COALESCE(equipamento,'N/A') AS equipamento,
+           SUM(CASE WHEN tipo='ENTRADA' THEN COALESCE(CAST(quantidade AS INTEGER),1) ELSE 0 END) AS entradas,
+           SUM(CASE WHEN tipo IN ('SAIDA','TRANSFERENCIA') THEN COALESCE(CAST(quantidade AS INTEGER),1) ELSE 0 END) AS saidas
+    FROM movimentos GROUP BY equipamento ORDER BY equipamento`);
+  const stat_setor = await sql(`
+    SELECT COALESCE(NULLIF(origem_destino,''),'N/A') AS origem, COUNT(*) AS total
+    FROM movimentos WHERE tipo='ENTRADA' GROUP BY origem ORDER BY total DESC LIMIT 10`);
+  const stat_marca = await sql(`
+    SELECT COALESCE(NULLIF(marca,''),'N/A') AS marca,
+           SUM(CASE WHEN tipo='ENTRADA' THEN COALESCE(CAST(quantidade AS INTEGER),1) ELSE 0 END) AS entradas,
+           SUM(CASE WHEN tipo IN ('SAIDA','TRANSFERENCIA') THEN COALESCE(CAST(quantidade AS INTEGER),1) ELSE 0 END) AS saidas
+    FROM movimentos GROUP BY marca ORDER BY marca`);
+  return { abas: abasFinal, pedido: c.global ? 'global' : 'especifico', ...out, estatisticas: { por_equipamento: stat_equip, por_origem: stat_setor, por_marca: stat_marca } };
+}
+
 export const FERRAMENTAS_DDGEI = {
   inventario: () => inventario(),
   tipos: () => tipos(),
@@ -177,6 +221,7 @@ export const FERRAMENTAS_DDGEI = {
   tipos_material: () => tiposMaterial(),
   movimento_material: () => movimentoMaterial(),
   material_sobrante: () => materialSobrante(),
+  relatorios: (p = {}) => relatorios(p),
   buscar_equipamento: (p = {}) => buscarEquipamento(p.termos)
 };
 
