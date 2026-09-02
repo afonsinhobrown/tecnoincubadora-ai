@@ -24,6 +24,17 @@ export const LANDING_HTML = `<!DOCTYPE html>
   .sistema .nome { font-weight: 700; font-size: 1.02rem; color: var(--azul); }
   .sistema .desc { font-size: .8rem; color: var(--cinza); flex: 1; }
   .sistema .estado { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+  .precos { margin-top: 34px; }
+  .precos h2 { text-align: center; color: var(--azul); margin-bottom: 6px; }
+  .precos > p { text-align: center; color: var(--cinza); font-size: .9rem; margin-bottom: 18px; }
+  .precos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .plano { background: #fff; border: 1px solid var(--borda); border-radius: 14px; padding: 20px; }
+  .plano.destaque { border-color: var(--azul); box-shadow: 0 4px 16px rgba(15,76,129,.15); }
+  .plano .p-nome { font-weight: 700; color: var(--azul); font-size: 1.05rem; }
+  .plano .p-preco { font-size: 1.6rem; font-weight: 800; color: var(--azul); margin: 6px 0 2px; }
+  .plano .p-mes { color: var(--cinza); font-size: .8rem; margin-bottom: 12px; }
+  .plano ul { list-style: none; font-size: .85rem; color: #334155; }
+  .plano li { padding: 4px 0; }
   .sistema .ativo { color: var(--verde); }
   .sistema .breve { color: var(--cinza); }
   .painel { background: #fff; border: 1px solid var(--borda); border-radius: 14px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.05); max-width: 420px; margin: 0 auto; }
@@ -74,10 +85,18 @@ export const LANDING_HTML = `<!DOCTYPE html>
   #btn-insights { background: var(--azul-claro); color: var(--azul); border: 0; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: .8rem; }
   #modo-info { display: none; margin: 10px 2px; padding: 8px 12px; border-radius: 8px; font-size: .8rem; background: #f1f5f9; color: var(--cinza); }
   #modo-info.off { background: var(--azul-claro); color: var(--azul); }
+  #progresso { display: none; height: 4px; border-radius: 4px; background: var(--borda); overflow: hidden; margin: 10px 2px; }
+  #progresso .bar { height: 100%; width: 0; background: var(--azul); animation: prog 1.4s ease-in-out infinite; }
+  @keyframes prog { 0% { width: 0; } 50% { width: 80%; } 100% { width: 100%; } }
+  #pdf-header { display: none; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #0f4c81; }
+  #pdf-header h2 { color: #0f4c81; font-size: 1.2rem; margin: 0 0 6px; }
+  #pdf-header .meta { font-size: .85rem; color: #555; }
   @media print {
     body * { visibility: hidden; }
+    #pdf-header, #pdf-header * { visibility: visible; }
+    #pdf-header { display: block; position: absolute; left: 0; top: 0; width: 100%; }
     #resposta, #resposta * { visibility: visible; }
-    #resposta { position: absolute; left: 0; top: 0; width: 100%; }
+    #resposta { position: absolute; left: 0; top: 90px; width: 100%; }
   }
 </style>
 </head>
@@ -92,6 +111,40 @@ export const LANDING_HTML = `<!DOCTYPE html>
   <section id="view-landing">
     <p class="subtitulo">Escolhe o teu sistema. Entra com as credenciais que já usas nele.</p>
     <div class="grid" id="grid-sistemas"></div>
+
+    <div class="precos">
+      <h2>Planos do assistente IA</h2>
+      <p>Preços mensais por sistema.</p>
+      <div class="precos-grid">
+        <div class="plano">
+          <div class="p-nome">Básico</div>
+          <div class="p-preco">1.000 MT</div><div class="p-mes">/ mês</div>
+          <ul>
+            <li>50 perguntas (prompts) por mês</li>
+            <li>1 utilizador</li>
+            <li>Sem download de ficheiros</li>
+          </ul>
+        </div>
+        <div class="plano destaque">
+          <div class="p-nome">Standard</div>
+          <div class="p-preco">1.700 MT</div><div class="p-mes">/ mês</div>
+          <ul>
+            <li>80 perguntas (prompts) por mês</li>
+            <li>3 utilizadores</li>
+            <li>10 downloads por mês</li>
+          </ul>
+        </div>
+        <div class="plano">
+          <div class="p-nome">Pro</div>
+          <div class="p-preco">2.500 MT</div><div class="p-mes">/ mês</div>
+          <ul>
+            <li>Perguntas ilimitadas</li>
+            <li>Downloads ilimitados</li>
+            <li>Partilha via WhatsApp</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- Vista 2: login do sistema -->
@@ -125,7 +178,9 @@ export const LANDING_HTML = `<!DOCTYPE html>
       <div class="exemplos" id="exemplos"></div>
     </div>
     <div id="estado"></div>
+    <div id="progresso"><div class="bar"></div></div>
     <div id="modo-info"></div>
+    <div id="pdf-header"></div>
     <div id="resposta"></div>
   </section>
 </main>
@@ -135,6 +190,7 @@ export const LANDING_HTML = `<!DOCTYPE html>
 <script>
 let SISTEMA_ATUAL = null;      // sistema selecionado
 let ULTIMA_RESPOSTA = null;    // última resposta { blocos, produtos, sistema } p/ exportação
+let SESSAO = null;             // { usuario, farmacia } do login
 const EXEMPLOS_PADRAO = [
   'quantas vendas tive hoje?', 'faturação do mês', 'produtos mais vendidos',
   'o que tenho que repor no estoque?', 'pedidos pendentes', 'amoxilina'
@@ -153,6 +209,7 @@ const elBtn = document.getElementById('btn');
 const elEstado = document.getElementById('estado');
 const elResp = document.getElementById('resposta');
 const elModo = document.getElementById('modo-info');
+const elProgresso = document.getElementById('progresso');
 const MZN = v => Number(v).toLocaleString('pt-MZ', { minimumFractionDigits: 2 }) + ' MZN';
 
 function getToken() { return localStorage.getItem('gf_token'); }
@@ -234,6 +291,14 @@ function sair() {
 // Exporta a resposta atual como PDF (usa o diálogo de impressão do navegador)
 function baixarPDF() {
   if (!elResp.innerHTML) { alert('Ainda não há resultados para exportar.'); return; }
+  const s = getSistema();
+  const cab = document.getElementById('pdf-header');
+  const usr = SESSAO?.usuario, ten = SESSAO?.farmacia;
+  cab.innerHTML = '<h2>🧠 TECNOINCUBADORA AI</h2>' +
+    '<div class="meta"><strong>Sistema:</strong> ' + esc(s ? s.nome : '—') +
+    ' &nbsp;·&nbsp; <strong>Utilizador:</strong> ' + esc(usr ? (usr.nome || usr.email || '—') : '—') +
+    ' &nbsp;·&nbsp; <strong>Tenant:</strong> ' + esc(ten ? (ten.nome || '—') : '—') +
+    ' &nbsp;·&nbsp; ' + new Date().toLocaleString('pt-PT') + '</div>';
   window.print();
 }
 
@@ -334,6 +399,7 @@ function baixarInsights() {
 // ── Chat ────────────────────────────────────────────────────────────
 function iniciarChat(d) {
   const s = getSistema();
+  SESSAO = { usuario: d.usuario || null, farmacia: d.farmacia || null };
   elSessaoNome.textContent = s.emoji + ' ' + s.nome + ' · ' +
     ((d.farmacia && d.farmacia.nome) || (d.usuario && (d.usuario.nome || d.usuario.email)) || 'sessão iniciada');
   renderExemplos(s.exemplos || EXEMPLOS_PADRAO);
@@ -359,6 +425,7 @@ async function perguntar() {
   elEstado.className = '';
   elEstado.textContent = 'A analisar…';
   elModo.style.display = 'none';
+  elProgresso.style.display = 'block';
   elResp.innerHTML = '';
   try {
     const r = await fetch(urlSistema('/pergunta'), {
@@ -384,7 +451,7 @@ async function perguntar() {
   } catch (err) {
     elEstado.className = 'erro';
     elEstado.textContent = 'Erro: ' + err.message;
-  } finally { elBtn.disabled = false; }
+  } finally { elBtn.disabled = false; elProgresso.style.display = 'none'; }
 }
 
 function renderBloco(b) {

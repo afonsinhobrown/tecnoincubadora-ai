@@ -25,8 +25,11 @@ export const PROMPT_DDGEI = {
   ferramentas: {
     inventario: 'resumo do inventário por estado',
     tipos: 'tipos de equipamento registados',
-    fornecedores: 'contagem de fornecedores',
-    funcionarios: 'contagem de funcionários',
+    fornecedores: 'fornecedores registados',
+    funcionarios: 'funcionários registados',
+    setores: 'setores da instituição',
+    movimentos: 'movimentos de equipamentos (entradas/saídas)',
+    material_sobrante: 'material sobrante (bom/mau) por local',
     buscar_equipamento: 'busca de equipamentos por nome/marca/série'
   },
 
@@ -56,8 +59,29 @@ export const PROMPT_DDGEI = {
       id: 'funcionarios',
       ferramenta: 'funcionarios',
       titulo: '👥 Funcionários',
-      frases: ['quantos funcionários', 'funcionários registados'],
+      frases: ['quantos funcionários', 'funcionários registados', 'lista de funcionários'],
       palavras: ['funcionários', 'funcionarios', 'funcionário']
+    },
+    {
+      id: 'setores',
+      ferramenta: 'setores',
+      titulo: '🏛️ Setores',
+      frases: ['quais setores', 'lista de setores', 'setores da instituição'],
+      palavras: ['setores', 'setor', 'departamentos', 'departamento']
+    },
+    {
+      id: 'movimentos',
+      ferramenta: 'movimentos',
+      titulo: '🔁 Movimentos',
+      frases: ['movimentos de equipamentos', 'entradas e saídas', 'últimos movimentos', 'movimentações'],
+      palavras: ['movimentos', 'movimentações', 'movimentacoes', 'entradas', 'saídas', 'saidas', 'movimento']
+    },
+    {
+      id: 'material_sobrante',
+      ferramenta: 'material_sobrante',
+      titulo: '📦 Material sobrante',
+      frases: ['material sobrante', 'sobras', 'material bom e mau'],
+      palavras: ['sobrante', 'sobras', 'material bom', 'material mau', 'material']
     }
   ],
 

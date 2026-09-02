@@ -27,13 +27,51 @@ async function tipos() {
 }
 
 async function fornecedores() {
-  const [r] = await sql(`SELECT count(*)::int AS fornecedores FROM fornecedores`);
-  return { fornecedores: r.fornecedores, novos_30d: 0 };
+  const lista = await sql(`SELECT id, nome FROM fornecedores ORDER BY nome ASC LIMIT 100`);
+  return { totais: { fornecedores: lista.length, novos_30d: 0 }, lista };
 }
 
 async function funcionarios() {
-  const [r] = await sql(`SELECT count(*)::int AS funcionarios FROM funcionarios`);
-  return { funcionarios: r.funcionarios, novos_30d: 0 };
+  const lista = await sql(`
+    SELECT f.id, f.nome, coalesce(f.cargo,'—') AS cargo, coalesce(s.nome,'—') AS setor
+    FROM funcionarios f
+    LEFT JOIN setores s ON s.id = f.setor_id
+    ORDER BY f.nome ASC LIMIT 100
+  `);
+  return { totais: { funcionarios: lista.length, novos_30d: 0 }, lista };
+}
+
+async function setores() {
+  const lista = await sql(`SELECT id, nome FROM setores ORDER BY nome ASC LIMIT 100`);
+  return { totais: { setores: lista.length, novos_30d: 0 }, lista };
+}
+
+async function movimentos() {
+  const lista = await sql(`
+    SELECT id, guia, tipo, equipamento, coalesce(marca,'') AS marca,
+           coalesce(numero_serie,'') AS numero_serie, data, coalesce(status,'') AS status,
+           coalesce(motivo,'') AS motivo
+    FROM movimentos
+    ORDER BY id DESC LIMIT 50
+  `);
+  const [totais] = await sql(`SELECT count(*)::int AS total, count(*) FILTER (WHERE tipo='ENTRADA')::int AS entradas, count(*) FILTER (WHERE tipo='SAIDA')::int AS saidas FROM movimentos`);
+  return { totais, lista };
+}
+
+async function materialSobrante() {
+  const lista = await sql(`
+    SELECT id, local_id AS local, tipo_material_id AS tipo_material,
+           quantidade_total::int AS quantidade_total, quantidade_bom::int AS bom, quantidade_mau::int AS mau
+    FROM eleitoral_material_sobrante
+    ORDER BY id DESC LIMIT 50
+  `);
+  const [totais] = await sql(`
+    SELECT count(*)::int AS registos,
+           coalesce(sum(quantidade_bom),0)::int AS total_bom,
+           coalesce(sum(quantidade_mau),0)::int AS total_mau
+    FROM eleitoral_material_sobrante
+  `);
+  return { totais, lista };
 }
 
 async function buscarEquipamento(termos) {
@@ -51,6 +89,9 @@ export const FERRAMENTAS_DDGEI = {
   tipos: () => tipos(),
   fornecedores: () => fornecedores(),
   funcionarios: () => funcionarios(),
+  setores: () => setores(),
+  movimentos: () => movimentos(),
+  material_sobrante: () => materialSobrante(),
   buscar_equipamento: (p = {}) => buscarEquipamento(p.termos)
 };
 
