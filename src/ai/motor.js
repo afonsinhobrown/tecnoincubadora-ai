@@ -257,8 +257,8 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
 
     if (part.functionCall) {
       const { name, args = {} } = part.functionCall;
-      // contexto autenticado da sessão, nunca vindo do modelo
-      const params = { ...args, ...ctx.tenant };
+      // contexto autenticado da sessão + consulta original (nunca vindos do modelo)
+      const params = { ...args, ...ctx.tenant, consulta: frase };
       if (name === 'buscar_produtos') {
         const produtos = await ferramentas(name, params);
         return { blocos: [], produtos };
@@ -319,7 +319,7 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
       if (!defFerramentas[intencao.ferramenta]) {
         throw new Error(`Ferramenta "${intencao.ferramenta}" não autorizada no prompt de sistema`);
       }
-      const params = { ...(intencao.parametros || {}), ...tenant };
+      const params = { ...(intencao.parametros || {}), ...tenant, consulta: frase };
       if (intencao.ferramenta === 'funcionarios' && identidade.nome === 'Assistente DDGEI') {
         const setor = extrairSetorDdgei(frase);
         if (setor) params.setor = setor;
