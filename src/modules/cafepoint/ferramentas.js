@@ -71,7 +71,14 @@ async function resumoClientes(restaurantId) {
     FROM "Customer"
     WHERE "restaurantId" = $1
   `, [restaurantId]);
-  return totais;
+  const lista = await sql(`
+    SELECT id, name AS nome, email, phone AS telefone, coalesce(type,'—') AS tipo
+    FROM "Customer"
+    WHERE "restaurantId" = $1
+    ORDER BY name ASC
+    LIMIT 100
+  `, [restaurantId]);
+  return { totais, lista };
 }
 
 async function buscarProdutos(termos, restaurantId) {

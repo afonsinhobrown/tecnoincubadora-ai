@@ -70,6 +70,12 @@ export const LANDING_HTML = `<!DOCTYPE html>
   .voltar { margin-top: 16px; background: none; border: 1.5px solid var(--borda); border-radius: 10px; padding: 9px 18px; cursor: pointer; font-size: .9rem; color: var(--azul); font-weight: 600; }
   .vazio { text-align: center; color: var(--cinza); padding: 30px 0; }
   footer { text-align: center; color: var(--cinza); font-size: .78rem; padding: 24px; }
+  #btn-pdf { background: var(--verde); color: #fff; border: 0; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: .8rem; }
+  @media print {
+    body * { visibility: hidden; }
+    #resposta, #resposta * { visibility: visible; }
+    #resposta { position: absolute; left: 0; top: 0; width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -102,6 +108,10 @@ export const LANDING_HTML = `<!DOCTYPE html>
     <div id="sessao-info">
       <span class="nome" id="sessao-nome"></span>
       <button class="voltar-link" onclick="sair()">Terminar sessão</button>
+      <button id="btn-pdf" onclick="baixarPDF()" title="Exportar a resposta atual em PDF">⬇ PDF</button>
+      <button id="btn-excel" onclick="baixarExcel()" title="Exportar os resultados em Excel/CSV">⬇ Excel</button>
+      <button id="btn-wa" onclick="partilharWhatsapp()" title="Partilhar por WhatsApp">WhatsApp</button>
+      <button id="btn-insights" onclick="mostrarInsights()" title="Resumo e indicadores de negócio">📊 Insights</button>
     </div>
     <div class="busca-box">
       <label for="q">Pergunta em linguagem normal</label>
@@ -120,10 +130,10 @@ export const LANDING_HTML = `<!DOCTYPE html>
 
 <script>
 let SISTEMA_ATUAL = null;      // sistema selecionado
-const EXEMPLOS = [
+let ULTIMA_RESPOSTA = null;    // última resposta { blocos, produtos, sistema } p/ exportação
+const EXEMPLOS_PADRAO = [
   'quantas vendas tive hoje?', 'faturação do mês', 'produtos mais vendidos',
-  'o que tenho que repor no estoque?', 'pedidos pendentes',
-  'quero comprar 2 paracetamol e 1 xarope em dinheiro', 'amoxilina'
+  'o que tenho que repor no estoque?', 'pedidos pendentes', 'amoxilina'
 ];
 const elLanding = document.getElementById('view-landing');
 const elLogin = document.getElementById('view-login');
@@ -216,11 +226,112 @@ function sair() {
   mostrarVista('landing');
 }
 
+// Exporta a resposta atual como PDF (usa o diálogo de impressão do navegador)
+function baixarPDF() {
+  if (!elResp.innerHTML) { alert('Ainda não há resultados para exportar.'); return; }
+  window.print();
+}
+
+// Recolhe todos os arrays de dados (tabelas) dos blocos da última resposta
+function arraysDaResposta() {
+  const arr = [];
+  (ULTIMA_RESPOSTA?.blocos || []).forEach(b => {
+    if (Array.isArray(b.dados)) arr.push({ titulo: b.titulo, linhas: b.dados });
+    else if (b.dados && Array.isArray(b.dados.lista)) arr.push({ titulo: b.titulo + ' (lista)', linhas: b.dados.lista });
+    else if (b.dados && Array.isArray(b.dados.por_forma_pagamento)) arr.push({ titulo: b.titulo + ' (por forma)', linhas: b.dados.por_forma_pagamento });
+  });
+  return arr;
+}
+
+function toCSV(linhas) {
+  if (!linhas.length) return '';
+  const cols = Object.keys(linhas[0]);
+  const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  return cols.join(';') + '\\n' + linhas.map(l => cols.map(c => esc(l[c])).join(';')).join('\\n');
+}
+
+// Exporta os resultados em Excel/CSV (separador ; para abrir direto no Excel pt)
+function baixarExcel() {
+  const arr = arraysDaResposta();
+  if (!arr.length) { alert('Não há tabelas de dados para exportar.'); return; }
+  const nome = (getSistema()?.nome || 'dados').replace(/\\s+/g, '_') + '_' + (ULTIMA_RESPOSTA?.query || 'consulta').replace(/[^\\w\\d]+/g, '_').slice(0, 30) + '.csv';
+  const conteudo = '\\ufeff' + arr.map(a => a.titulo + '\\n' + toCSV(a.linhas)).join('\\n\\n');
+  const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nome;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Texto-resumo da resposta para partilha/insights
+function textoResumo() {
+  const linhas = ['*' + (getSistema()?.nome || 'Consulta') + ' — ' + (ULTIMA_RESPOSTA?.query || '') + '*', ''];
+  (ULTIMA_RESPOSTA?.blocos || []).forEach(b => {
+    linhas.push('*' + b.titulo + '*');
+    if (Array.isArray(b.dados)) {
+      b.dados.slice(0, 15).forEach(r => linhas.push('- ' + (Object.values(r).join(' | '))));
+    } else if (b.dados && typeof b.dados === 'object') {
+      const t = b.dados.totais || b.dados;
+      Object.entries(t).filter(([,v]) => typeof v !== 'object').forEach(([k, v]) => linhas.push('• ' + k.replace(/_/g, ' ') + ': ' + v));
+      if (Array.isArray(b.dados.lista)) b.dados.lista.slice(0, 15).forEach(r => linhas.push('- ' + (Object.values(r).join(' | '))));
+    }
+    linhas.push('');
+  });
+  return linhas.join('\\n');
+}
+
+// Partilha a resposta por WhatsApp
+function partilharWhatsapp() {
+  if (!ULTIMA_RESPOSTA) { alert('Ainda não há resultados para partilhar.'); return; }
+  const texto = encodeURIComponent(textoResumo());
+  window.open('https://wa.me/?text=' + texto, '_blank');
+}
+
+// Resumo/indicadores de negócio (Business Insights) + download
+function mostrarInsights() {
+  if (!ULTIMA_RESPOSTA) { alert('Ainda não há resultados.'); return; }
+  const blob = ULTIMA_RESPOSTA;
+  const linhas = ['📊 Business Insights — ' + (getSistema()?.nome || ''), '', 'Pergunta: ' + (blob.query || ''), '', textoResumo(), ''];
+  // indicadores adicionais
+  (blob.blocos || []).forEach(b => {
+    if (!b.dados) return;
+    if (Array.isArray(b.dados)) {
+      linhas.push('Indicador: ' + (b.dados.length) + ' registos listados.');
+    } else if (b.dados.totais) {
+      const t = b.dados.totais;
+      const vals = Object.entries(t).filter(([,v]) => typeof v !== 'object').map(([k, v]) => \`\${k.replace(/_/g,' ')}: \${v}\`);
+      linhas.push('Indicador: ' + vals.join(' · '));
+      if (Array.isArray(b.dados.lista)) linhas.push('Registos: ' + b.dados.lista.length);
+    }
+  });
+  const corpo = linhas.join('\\n');
+  elEstado.className = '';
+  elEstado.textContent = '';
+  const box = document.createElement('div');
+  box.className = 'bloco';
+  box.innerHTML = '<h3>📊 Business Insights</h3><pre style="white-space:pre-wrap;font-family:inherit;font-size:.9rem">' + esc(corpo) + '</pre>' +
+    '<button class="voltar" onclick="baixarInsights()">⬇ Baixar (.txt)</button>';
+  elResp.appendChild(box);
+}
+
+function baixarInsights() {
+  if (!ULTIMA_RESPOSTA) return;
+  const corpo = textoResumo();
+  const blob = new Blob(['📊 Business Insights — ' + (getSistema()?.nome || '') + '\\n\\n' + corpo], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'insights_' + (getSistema()?.slug || 'sistema') + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 // ── Chat ────────────────────────────────────────────────────────────
 function iniciarChat(d) {
   const s = getSistema();
   elSessaoNome.textContent = s.emoji + ' ' + s.nome + ' · ' +
     ((d.farmacia && d.farmacia.nome) || (d.usuario && (d.usuario.nome || d.usuario.email)) || 'sessão iniciada');
+  renderExemplos(s.exemplos || EXEMPLOS_PADRAO);
   elEstado.className = '';
   elEstado.textContent = 'Sessão iniciada.';
   elResp.innerHTML = '';
@@ -252,6 +363,7 @@ async function perguntar() {
     const d = await r.json();
     if (r.status === 401) { sair(); throw new Error('Sessão expirada. Inicie sessão de novo.'); }
     if (!r.ok) throw new Error(d.error || 'Erro');
+    ULTIMA_RESPOSTA = { blocos: d.blocos, produtos: d.produtos, sistema: getSistema(), query };
     const temRel = d.blocos.length > 0, temProd = d.total_produtos > 0;
     elEstado.textContent = temRel || temProd
       ? 'Resultados para “' + query + '”:'
@@ -293,6 +405,22 @@ function renderDados(container, dados) {
     return;
   }
   if (dados && typeof dados === 'object') {
+    // formato { totais: {...}, lista: [...] } -> KPIs + tabela da lista
+    if (dados.totais && typeof dados.totais === 'object') {
+      const t = dados.totais;
+      const entradas = Object.entries(t).filter(([, v]) => v != null && typeof v !== 'object');
+      if (entradas.length) {
+        container.innerHTML = '<div class="kpi-grid">' + entradas.map(([k, v]) =>
+          \`<div class="kpi"><div class="valor">\${esc(String(v))}</div><div class="rotulo">\${esc(cap(String(k).replace(/_/g, ' ')))}</div></div>\`
+        ).join('') + '</div>';
+      }
+      if (Array.isArray(dados.lista) && dados.lista.length) {
+        const chaves = Object.keys(dados.lista[0]).filter(k => k !== 'id');
+        renderTabela(container, dados.lista, chaves.map(c => cap(String(c).replace(/_/g, ' '))),
+          r => chaves.map(c => esc(String(r[c] ?? ''))));
+      }
+      return;
+    }
     const entradas = Object.entries(dados).filter(([, v]) => v != null && typeof v !== 'object');
     if (entradas.length) {
       container.innerHTML = '<div class="kpi-grid">' + entradas.map(([k, v]) =>
@@ -335,11 +463,16 @@ function renderEstoque(container, dados) {
 }
 
 function renderClientes(container, d) {
+  const t = d.totais || d;
   container.innerHTML = \`
     <div class="kpi-grid">
-      <div class="kpi"><div class="valor">\${d.clientes}</div><div class="rotulo">Clientes registados</div></div>
-      <div class="kpi"><div class="valor">\${d.novos_30d}</div><div class="rotulo">Novos (30 dias)</div></div>
+      <div class="kpi"><div class="valor">\${t.clientes ?? '—'}</div><div class="rotulo">Registados</div></div>
+      <div class="kpi"><div class="valor">\${t.ativos ?? t.novos_30d ?? '—'}</div><div class="rotulo">\${t.ativos != null ? 'Ativos' : 'Novos (30d)'}</div></div>
     </div>\`;
+  if (d.lista && d.lista.length) {
+    renderTabela(container, d.lista, ['Nome', 'Telefone', 'Plano', 'Estado'],
+      r => [esc(r.nome || ''), esc(r.telefone || '—'), esc(r.plano || '—'), esc(cap(r.status || '—'))]);
+  }
 }
 
 function renderTabela(container, linhas, cab, fmt, numCols = false, onClick = null) {
@@ -418,12 +551,16 @@ function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(
   }
 })();
 
-EXEMPLOS.forEach(txt => {
-  const b = document.createElement('button');
-  b.textContent = '“' + txt + '”';
-  b.onclick = () => { elQ.value = txt; perguntar(); };
-  document.getElementById('exemplos').appendChild(b);
-});
+function renderExemplos(exemplos) {
+  const caixa = document.getElementById('exemplos');
+  caixa.innerHTML = '';
+  (exemplos && exemplos.length ? exemplos : EXEMPLOS_PADRAO).forEach(txt => {
+    const b = document.createElement('button');
+    b.textContent = '“' + txt + '”';
+    b.onclick = () => { elQ.value = txt; perguntar(); };
+    caixa.appendChild(b);
+  });
+}
 elQ.addEventListener('keydown', e => { if (e.key === 'Enter') perguntar(); });
 elPass.addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 </script>

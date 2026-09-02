@@ -67,8 +67,8 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
         add(nome, desc, {
           type: 'OBJECT',
           properties: {
-            periodo: { type: 'STRING', enum: ['hoje', 'semana', 'mes', '30d'],
-              description: 'Período da análise; infere da pergunta (ex.: "hoje", "semana", "mês"). Padrão 30d.' }
+            periodo: { type: 'STRING', enum: ['total', 'hoje', 'semana', 'mes', '30d'],
+              description: 'Período da análise. "total" = tudo faturado (padrão). Use "hoje", "semana" ou "mês" apenas se o utilizador os pedir explicitamente.' }
           }
         });
       } else if (nome === 'buscar_produtos') {
@@ -188,7 +188,7 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
     for (const [periodo, palavras] of Object.entries(periodos)) {
       if (palavras.some(p => fraseNorm.includes(normalizar(p)))) return periodo;
     }
-    return '30d';
+    return 'total';
   }
 
   async function processarPadrao(frase, ctx) {
@@ -225,7 +225,15 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
     if (API_KEY) {
       try {
         const r = await processarLLM(frase, ctx);
-        if (r.blocos.length || r.produtos.length) return r;
+        // resposta com ferramenta executada (dados reais) -> usar
+        const usouFerramenta = r.blocos.some(b => b.intencao !== 'resposta_llm') || r.produtos.length > 0;
+        if (usouFerramenta) return r;
+        // o LLM respondeu em texto livre (sem ferramenta): não confiar em
+        // números; correr o fallback por regras que chama a ferramenta real.
+        const padrao = await processarPadrao(frase, ctx);
+        if (padrao.blocos.some(b => b.dados) || padrao.produtos.length) return padrao;
+        // nada de dados no fallback -> aceitar a resposta conversacional do LLM
+        return r;
       } catch (err) {
         console.error('LLM falhou, a usar motor padrão:', err.message);
       }

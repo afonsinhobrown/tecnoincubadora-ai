@@ -80,7 +80,15 @@ async function resumoClientes(tenantId) {
     FROM customers
     WHERE tenant_id = $1 AND is_active = true
   `, [tenantId]);
-  return totais;
+  const lista = await sql(`
+    SELECT id, name AS nome, email, phone AS telefone, coalesce(customer_type,'—') AS tipo,
+           current_credit AS credito_atual
+    FROM customers
+    WHERE tenant_id = $1 AND is_active = true
+    ORDER BY name ASC
+    LIMIT 100
+  `, [tenantId]);
+  return { totais, lista };
 }
 
 async function buscarProdutos(termos, tenantId) {

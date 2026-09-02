@@ -73,11 +73,19 @@ export async function estoqueBaixo(farmaciaId) {
 export async function resumoClientes(farmaciaId) {
   const [totais] = await sql(`
     SELECT count(*)::int AS clientes,
-           count(*) FILTER (WHERE data_criacao >= now() - interval '30 days')::int AS novos_30d
+           count(*) FILTER (WHERE data_cadastro >= now() - interval '30 days')::int AS novos_30d
     FROM clientes_cliente
     WHERE farmacia_id = $1
   `, [farmaciaId]);
-  return totais;
+  const lista = await sql(`
+    SELECT id, nome_completo AS nome, telefone, email, cidade,
+           coalesce(tipo,'—') AS tipo
+    FROM clientes_cliente
+    WHERE farmacia_id = $1
+    ORDER BY nome_completo ASC
+    LIMIT 100
+  `, [farmaciaId]);
+  return { totais, lista };
 }
 
 export async function pedidosPorEstado(farmaciaId) {

@@ -75,7 +75,14 @@ async function resumoClientes(userId) {
     FROM suppliers
     WHERE user_id = $1
   `, [userId]);
-  return { ...clientes, ...fornecedores, novos_30d: 0 };
+  const lista = await sql(`
+    SELECT id, name AS nome, email, phone AS telefone, coalesce(nif,'—') AS nif
+    FROM customers
+    WHERE user_id = $1
+    ORDER BY name ASC
+    LIMIT 100
+  `, [userId]);
+  return { totais: { ...clientes, ...fornecedores, novos_30d: 0 }, lista };
 }
 
 async function buscarProdutos(termos, userId) {

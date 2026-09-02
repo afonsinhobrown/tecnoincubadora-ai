@@ -24,10 +24,16 @@ export const PROMPT_GYM = {
 
   ferramentas: {
     buscar_produtos: 'busca de produtos por nome',
-    vendas: 'resumo de vendas e faturação por período (hoje | semana | mes | 30d)',
+    vendas: 'resumo de vendas e faturação por período (hoje | semana | mes | total)',
     top_produtos: 'planos mais populares',
     estoque_baixo: 'produtos com estoque baixo ou esgotados',
-    clientes: 'contagem de alunos registados',
+    clientes: 'lista e contagem de alunos',
+    dentro: 'alunos que estão agora dentro do ginásio (último registo = entrada)',
+    faturas: 'faturas por estado (pago, pendente, anulada)',
+    mensalidades: 'mensalidades/planos por estado (ativas, pendentes, expiradas)',
+    ranking_clientes: 'ranking de clientes por valor de faturas',
+    caixa: 'sessões de caixa (abertas e fechadas) e saldos',
+    faturacao_mes: 'faturação agregada por mês',
     detalhe_produto: 'ficha de um produto com preço e estoque'
   },
 
@@ -58,8 +64,50 @@ export const PROMPT_GYM = {
       id: 'clientes',
       ferramenta: 'clientes',
       titulo: '👥 Alunos',
-      frases: ['quantos alunos tenho', 'alunos registados', 'quantos clientes', 'alunos ativos'],
+      frases: ['quantos alunos tenho', 'alunos registados', 'quantos clientes', 'alunos ativos', 'lista de alunos'],
       palavras: ['alunos', 'aluno', 'clientes', 'cliente', 'membros']
+    },
+    {
+      id: 'dentro',
+      ferramenta: 'dentro',
+      titulo: '🏠 Quem está dentro do ginásio',
+      frases: ['quem está dentro', 'quem está no ginásio', 'alunos dentro agora', 'quem entrou'],
+      palavras: ['dentro', 'entraram', 'estão no ginásio', 'presentes agora', 'dentro do ginásio', 'quem entrou']
+    },
+    {
+      id: 'faturas',
+      ferramenta: 'faturas',
+      titulo: '🧾 Faturas',
+      frases: ['faturas', 'faturas pagas', 'faturas pendentes', 'faturas anuladas', 'lista de faturas'],
+      palavras: ['faturas', 'fatura', 'facturas', 'factura']
+    },
+    {
+      id: 'mensalidades',
+      ferramenta: 'mensalidades',
+      titulo: '💳 Mensalidades',
+      frases: ['mensalidades pagas', 'mensalidades pendentes', 'mensalidades expiradas', 'mensalidades vencidas', 'planos ativos'],
+      palavras: ['mensalidade', 'mensalidades', 'vencidas', 'expiradas', 'pendentes de pagamento', 'planos ativos']
+    },
+    {
+      id: 'ranking_clientes',
+      ferramenta: 'ranking_clientes',
+      titulo: '🏆 Ranking de clientes',
+      frases: ['ranking de clientes', 'melhores clientes', 'clientes com mais faturas', 'top clientes'],
+      palavras: ['ranking', 'melhores clientes', 'top clientes', 'mais faturas']
+    },
+    {
+      id: 'caixa',
+      ferramenta: 'caixa',
+      titulo: '💰 Caixa',
+      frases: ['estado do caixa', 'sessões de caixa', 'caixa aberto', 'saldo do caixa'],
+      palavras: ['caixa', 'sessão de caixa', 'saldo do caixa', 'fecho de caixa']
+    },
+    {
+      id: 'faturacao_mes',
+      ferramenta: 'faturacao_mes',
+      titulo: '📅 Faturação por mês',
+      frases: ['faturação por mês', 'faturação mensal', 'vendas por mês', 'faturação dos últimos meses'],
+      palavras: ['por mês', 'por mes', 'mensal', 'faturação por mês', 'faturação mensal']
     }
   ],
 

@@ -40,7 +40,15 @@ async function clientes(tenantId) {
     FROM clientes
     WHERE tenant_id = $1 AND deleted = false
   `, [tenantId]);
-  return totais;
+  const lista = await sql(`
+    SELECT id, nome, coalesce(apelido,'') AS apelido, telefone, email,
+           coalesce(tipo,'—') AS tipo
+    FROM clientes
+    WHERE tenant_id = $1 AND deleted = false
+    ORDER BY nome ASC
+    LIMIT 100
+  `, [tenantId]);
+  return { totais, lista };
 }
 
 async function topClientes(tenantId) {

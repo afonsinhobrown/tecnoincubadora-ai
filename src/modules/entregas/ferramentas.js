@@ -58,9 +58,16 @@ async function topProdutos(ctx) {
   `, params);
 }
 
-async function clientes(ctx) {
+async function clientes() {
   const [totais] = await sql(`SELECT count(*)::int AS clientes, 0::int AS novos_30d FROM "Client"`);
-  return totais;
+  const lista = await sql(`
+    SELECT c.id, u.name AS nome, u.email, u.phone AS telefone
+    FROM "Client" c
+    JOIN "User" u ON u.id = c."userId"
+    ORDER BY u.name ASC
+    LIMIT 100
+  `);
+  return { totais, lista };
 }
 
 async function lojas() {

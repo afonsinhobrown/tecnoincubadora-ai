@@ -66,7 +66,15 @@ async function resumoClientes(gymId) {
     FROM clients
     WHERE gym_id = $1
   `, [gymId]);
-  return totais;
+  const lista = await sql(`
+    SELECT id, name AS nome, phone AS telefone, coalesce(plan_name,'—') AS plano,
+           status, coalesce(end_date,'') AS data_fim
+    FROM clients
+    WHERE gym_id = $1
+    ORDER BY name ASC
+    LIMIT 100
+  `, [gymId]);
+  return { totais, lista };
 }
 
 async function buscarProdutos(termos, gymId) {
@@ -92,13 +100,124 @@ async function detalheProduto(id, gymId) {
   return { ...p[0], estoque: p[0].quantidade != null ? [{ quantidade: p[0].quantidade, preco_venda: p[0].preco_venda }] : [] };
 }
 
+// Alunos que estão agora dentro do ginásio (último registo = entrada)
+async function quemDentro(gymId) {
+  return sql(`
+    WITH ult AS (
+      SELECT DISTINCT ON (user_id) user_id, user_name, type, timestamp
+      FROM attendance
+      WHERE gym_id = $1
+      ORDER BY user_id, timestamp DESC
+    )
+    SELECT user_name AS nome, timestamp AS ultima
+    FROM ult
+    WHERE type IN ('in','Entrada')
+    ORDER BY timestamp DESC
+  `, [gymId]);
+}
+
+// Faturas por estado
+async function faturas(gymId) {
+  const lista = await sql(`
+    SELECT id, client_name AS cliente, amount AS valor,
+           coalesce(status,'—') AS estado, date AS data, payment_method AS pagamento
+    FROM invoices
+    WHERE gym_id = $1
+    ORDER BY date DESC
+    LIMIT 100
+  `, [gymId]);
+  const [totais] = await sql(`
+    SELECT count(*)::int AS faturas,
+           count(*) FILTER (WHERE status = 'pago')::int AS pagas,
+           count(*) FILTER (WHERE status = 'pendente')::int AS pendentes,
+           coalesce(sum(amount) FILTER (WHERE status = 'pago'),0)::numeric(12,2) AS total_pago
+    FROM invoices
+    WHERE gym_id = $1
+  `, [gymId]);
+  return { totais, lista };
+}
+
+// Mensalidades/planos por estado (ativo, pendente, expirado)
+async function mensalidades(gymId) {
+  const lista = await sql(`
+    SELECT id, name AS aluno, coalesce(plan_name,'—') AS plano,
+           coalesce(status,'—') AS estado, coalesce(end_date,'') AS fim
+    FROM clients
+    WHERE gym_id = $1
+    ORDER BY name ASC
+    LIMIT 100
+  `, [gymId]);
+  const [totais] = await sql(`
+    SELECT count(*)::int AS total,
+           count(*) FILTER (WHERE status = 'active')::int AS ativos,
+           count(*) FILTER (WHERE end_date IS NOT NULL AND end_date < to_char(now(),'YYYY-MM-DD'))::int AS expirados
+    FROM clients
+    WHERE gym_id = $1
+  `, [gymId]);
+  return { totais, lista };
+}
+
+// Ranking de clientes por valor de faturas
+async function rankingClientes(gymId) {
+  return sql(`
+    SELECT client_name AS nome,
+           count(*)::int AS quantidade_vendida,
+           coalesce(sum(amount),0)::numeric(12,2) AS receita
+    FROM invoices
+    WHERE gym_id = $1 AND status = 'pago'
+    GROUP BY client_name
+    ORDER BY receita DESC
+    LIMIT 10
+  `, [gymId]);
+}
+
+// Sessões de caixa
+async function caixa(gymId) {
+  const lista = await sql(`
+    SELECT id, user_email AS operador, status,
+           coalesce(saldo_inicial,0) AS saldo_inicial, coalesce(saldo_fecho,0) AS saldo_fecho,
+           data_abertura, data_fecho
+    FROM caixa_sessions
+    WHERE gym_id = $1
+    ORDER BY data_abertura DESC
+    LIMIT 20
+  `, [gymId]);
+  const [totais] = await sql(`
+    SELECT count(*)::int AS sessoes,
+           count(*) FILTER (WHERE status = 'aberto')::int AS abertas
+    FROM caixa_sessions
+    WHERE gym_id = $1
+  `, [gymId]);
+  return { totais, lista };
+}
+
+// Faturação agregada por mês (só pagas)
+async function faturacaoMes(gymId) {
+  return sql(`
+    SELECT to_char(to_date(date,'YYYY-MM-DD'),'YYYY-MM') AS mes,
+           count(*)::int AS pedidos,
+           coalesce(sum(amount),0)::numeric(12,2) AS total
+    FROM invoices
+    WHERE gym_id = $1 AND status = 'pago' AND date IS NOT NULL AND date <> ''
+    GROUP BY mes
+    ORDER BY mes DESC
+    LIMIT 12
+  `, [gymId]);
+}
+
 export const FERRAMENTAS_GYM = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, gymDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', gymDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', gymDe(p)),
   top_produtos: (p = {}) => topProdutos(gymDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(gymDe(p)),
   clientes: (p = {}) => resumoClientes(gymDe(p)),
-  detalhe_produto: (p = {}) => detalheProduto(p.id, gymDe(p))
+  detalhe_produto: (p = {}) => detalheProduto(p.id, gymDe(p)),
+  dentro: (p = {}) => quemDentro(gymDe(p)),
+  faturas: (p = {}) => faturas(gymDe(p)),
+  mensalidades: (p = {}) => mensalidades(gymDe(p)),
+  ranking_clientes: (p = {}) => rankingClientes(gymDe(p)),
+  caixa: (p = {}) => caixa(gymDe(p)),
+  faturacao_mes: (p = {}) => faturacaoMes(gymDe(p))
 };
 
 export async function executarFerramentaGym(nome, params = {}) {

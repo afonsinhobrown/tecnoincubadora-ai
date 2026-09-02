@@ -75,7 +75,15 @@ async function resumoClientes(companyId) {
     FROM "Partner"
     WHERE "companyId" = $1
   `, [companyId]);
-  return totais;
+  const lista = await sql(`
+    SELECT id, name AS nome, coalesce(type,'—') AS tipo, phone AS telefone,
+           coalesce(category,'—') AS categoria, coalesce("totalPurchased",0) AS total_comprado
+    FROM "Partner"
+    WHERE "companyId" = $1
+    ORDER BY name ASC
+    LIMIT 100
+  `, [companyId]);
+  return { totais, lista };
 }
 
 async function buscarProdutos(termos, companyId) {

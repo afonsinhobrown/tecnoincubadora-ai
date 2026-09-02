@@ -32,14 +32,14 @@ async function resumoVendas(periodo, salonId) {
            coalesce(sum(total),0)::numeric(12,2) AS total,
            coalesce(avg(total),0)::numeric(12,2) AS ticket_medio
     FROM "Invoices"
-    WHERE "SalonId" = $1 AND status <> 'voided' AND "createdAt" >= $2
+    WHERE "SalonId" = $1 AND status <> 'voided' AND "paymentStatus" = 'paid' AND "createdAt" >= $2
   `, [salonId, inicio]);
   const porForma = await sql(`
     SELECT coalesce("paymentMethod",'—') AS forma_pagamento,
            count(*)::int AS pedidos,
            coalesce(sum(total),0)::numeric(12,2) AS total
     FROM "Invoices"
-    WHERE "SalonId" = $1 AND status <> 'voided' AND "createdAt" >= $2
+    WHERE "SalonId" = $1 AND status <> 'voided' AND "paymentStatus" = 'paid' AND "createdAt" >= $2
     GROUP BY "paymentMethod" ORDER BY total DESC
   `, [salonId, inicio]);
   return { totais, por_forma_pagamento: porForma };
@@ -76,7 +76,14 @@ async function resumoClientes(salonId) {
     FROM "Clients"
     WHERE "SalonId" = $1
   `, [salonId]);
-  return totais;
+  const lista = await sql(`
+    SELECT id, name AS nome, phone AS telefone, email, "xonguileId" AS codigo
+    FROM "Clients"
+    WHERE "SalonId" = $1
+    ORDER BY name ASC
+    LIMIT 100
+  `, [salonId]);
+  return { totais, lista };
 }
 
 async function buscarProdutos(termos, salonId) {

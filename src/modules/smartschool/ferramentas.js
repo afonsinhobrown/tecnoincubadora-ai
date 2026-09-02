@@ -45,7 +45,15 @@ async function clientes(escolaId) {
     FROM "Aluno"
     WHERE "escolaId" = $1
   `, [escolaId]);
-  return totais;
+  const lista = await sql(`
+    SELECT id, nome, apelido, "numeroProcesso" AS numero_processo, turmaId,
+           coalesce(status,'—') AS status
+    FROM "Aluno"
+    WHERE "escolaId" = $1
+    ORDER BY nome ASC
+    LIMIT 100
+  `, [escolaId]);
+  return { totais, lista };
 }
 
 async function turmas(escolaId) {
