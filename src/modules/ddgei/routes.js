@@ -40,7 +40,7 @@ router.post('/pergunta', async (req, res) => {
     const cacheKey = { sistemaSlug: 'ddgei', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId), query };
   const cached = await getCache(cacheKey);
   if (cached) return res.json({ ...cached, modo: 'cache', licenca: _lic });
-  const { blocos, modo } = await motor.processar(query, { tenant: {} });
+  const { blocos, modo } = await motor.processar(query, { tenant: { consulta: query } });
     await registrarUsoPrompt({ sistemaSlug: 'ddgei', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
       try { await registrarAuditoria({ sistemaSlug: 'ddgei', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId || ''), tenantNome: _lic.lic?.tenant_nome || '', usuarioId: String(req.ctx.usuarioId||''), usuarioNome: '', query, modo, plano: _lic.plano, licencaStatus: _lic.lic?.status || '', ip: req.ip }); } catch {}
     if (blocos.length) await setCache({ sistemaSlug: 'ddgei', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId), query, resposta: { blocos, produtos: [], total_produtos: 0, modo } });

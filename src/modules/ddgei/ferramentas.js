@@ -31,16 +31,53 @@ async function fornecedores() {
   return { totais: { fornecedores: lista.length, novos_30d: 0 }, lista };
 }
 
-async function funcionarios({ setor } = {}) {
-  const termoSetor = String(setor || '').trim().toLowerCase();
-  const lista = await sql(`
-    SELECT f.id, f.nome, coalesce(f.cargo,'—') AS cargo, coalesce(s.nome,'—') AS setor
-    FROM funcionarios f
-    LEFT JOIN setores s ON s.id = f.setor_id
-    WHERE $1 = '' OR lower(coalesce(s.nome,'')) LIKE $2
-    ORDER BY f.nome ASC LIMIT 100
-  `, [termoSetor, `%${termoSetor}%`]);
-  return { totais: { funcionarios: lista.length, novos_30d: 0 }, filtro: termoSetor ? { setor } : undefined, lista };
+import { extrairCriterio } from '../../criterios/index.js';
+
+// Dicionário de departamentos reais (setores) para distinguir global/específico
+async function departamentosDicionario() {
+  const setores = await sql(`SELECT id, nome FROM setores ORDER BY nome`);
+  return setores.map(s => {
+    // rotuloCurto: sem prefixos genéricos (departamento de/das, gabinete...)
+    const curto = String(s.nome).replace(/^(DEPARTAMENTO|SETOR|SECTOR|GABINETE|REPARTI[ÇC][AÃ]O|DIREC[ÇC][AÃ]O|DOOE|DDGEI|UGEA)\s+(DE|DO|DA|DOS|DAS)?\s*/i, '').trim();
+    return { rotulo: s.nome, rotuloCurto: curto, valor: s.id, campo: 'setor_id' };
+  });
+}
+
+async function funcionarios({ setor, consulta } = {}) {
+  const dicionario = await departamentosDicionario();
+
+  // 1) setor explícito do LLM? 2) deduzir do texto da pergunta (dicionário)
+  let criterio = null;
+  if (setor && String(setor).trim()) {
+    const c = extrairCriterio(String(setor), dicionario);
+    if (!c.global) criterio = c.criterio;
+  }
+  if (!criterio && consulta) {
+    const c = extrairCriterio(String(consulta), dicionario);
+    if (!c.global) criterio = c.criterio;
+  }
+
+  const especifico = !!criterio; // distingue pedido específico vs global
+  const lista = especifico
+    ? await sql(`
+        SELECT f.id, f.nome, coalesce(f.cargo,'—') AS cargo, coalesce(s.nome,'—') AS setor
+        FROM funcionarios f
+        LEFT JOIN setores s ON s.id = f.setor_id
+        WHERE f.setor_id = $1
+        ORDER BY f.nome ASC LIMIT 200
+      `, [criterio.valor])
+    : await sql(`
+        SELECT f.id, f.nome, coalesce(f.cargo,'—') AS cargo, coalesce(s.nome,'—') AS setor
+        FROM funcionarios f
+        LEFT JOIN setores s ON s.id = f.setor_id
+        ORDER BY f.nome ASC LIMIT 200
+      `);
+  return {
+    totais: { funcionarios: lista.length, novos_30d: 0 },
+    pedido: especifico ? 'especifico' : 'global',
+    filtro: criterio ? { departamento: criterio.valor } : undefined,
+    lista
+  };
 }
 
 async function setores() {
