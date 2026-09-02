@@ -549,7 +549,8 @@ async function perguntar() {
     ULTIMA_RESPOSTA = { blocos: d.blocos, produtos: d.produtos, sistema: getSistema(), query };
     const temRel = d.blocos.length > 0, temProd = d.total_produtos > 0;
     elModo.className = '';
-    if (d.modo === 'interno') { elModo.style.display = 'block'; elModo.className = ''; elModo.textContent = '⚙ Motor interno — a responder com os recursos próprios.'; }
+    if (d.modo === 'cache') { elModo.style.display = 'block'; elModo.className = 'off'; elModo.textContent = '⚡ Cache — resposta instantânea (memorizada).'; }
+    else if (d.modo === 'interno') { elModo.style.display = 'block'; elModo.className = ''; elModo.textContent = '⚙ Motor interno — a responder com os recursos próprios.'; }
     else if (d.modo === 'externo') { elModo.style.display = 'block'; elModo.className = 'off'; elModo.textContent = '🧠 Assistido por IA externa.'; }
     else elModo.style.display = 'none';
     elEstado.textContent = temRel || temProd
@@ -570,10 +571,29 @@ async function perguntar() {
   } finally { elBtn.disabled = false; elProgresso.style.display = 'none'; }
 }
 
+function renderMeta(container, b) {
+  const d = b.dados;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return;
+  const bits = [];
+  if (d.pedido === 'especifico') bits.push('<span style="color:var(--azul);font-weight:600">Filtrado</span>');
+  else if (d.pedido === 'global') bits.push('<span style="color:var(--cinza)">Visão global</span>');
+  if (d.filtro) {
+    const kv = Object.entries(d.filtro).map(([k, v]) => k.replace(/_/g, ' ') + ': <b>' + esc(v) + '</b>');
+    bits.push(kv.join(' · '));
+  }
+  if (bits.length) {
+    const m = document.createElement('div');
+    m.style.cssText = 'font-size:.78rem;margin-bottom:10px;padding:6px 10px;border-radius:6px;background:#f1f5f9;';
+    m.innerHTML = bits.join(' &nbsp;|&nbsp; ');
+    container.prepend(m);
+  }
+}
+
 function renderBloco(b) {
   const el = document.createElement('div');
   el.className = 'bloco';
   const corpo = document.createElement('div');
+  renderMeta(corpo, b);
   if (b.erro) corpo.innerHTML = '<p class="alerta">Erro: ' + esc(b.erro) + '</p>';
   else if (b.intencao.startsWith('vendas_')) renderVendas(corpo, b.dados);
   else if (b.intencao === 'top_produtos') renderTabela(corpo, b.dados,
