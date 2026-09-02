@@ -47,8 +47,8 @@ router.post('/pergunta', async (req, res) => {
     buscarProdutos: (frase, limite) => buscarProdutos(frase, limite, farmaciaId)
   };
   try {
-    const { blocos, produtos } = await processar(query, ctx);
-    res.json({ blocos, produtos: produtos.slice(0, 8), total_produtos: produtos.length });
+    const { blocos, produtos, modo } = await processar(query, ctx);
+    res.json({ blocos, produtos: produtos.slice(0, 8), total_produtos: produtos.length, modo });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

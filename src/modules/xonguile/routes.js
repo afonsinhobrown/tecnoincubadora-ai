@@ -41,8 +41,8 @@ router.post('/pergunta', async (req, res) => {
     buscarProdutos: (frase, limite) => bx(frase, salonId)
   };
   try {
-    const { blocos, produtos } = await motor.processar(query, ctx);
-    res.json({ blocos, produtos, total_produtos: produtos.length });
+    const { blocos, produtos, modo } = await motor.processar(query, ctx);
+    res.json({ blocos, produtos, total_produtos: produtos.length, modo });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -37,8 +37,8 @@ router.post('/pergunta', async (req, res) => {
     const t = await sql(`SELECT schema_name FROM tenants WHERE id = $1`, [req.ctx.farmaciaId]);
     const schema = t[0]?.schema_name;
     if (!schema) return res.status(403).json({ error: 'Tenant sem schema configurado.' });
-    const { blocos, produtos } = await motor.processar(query, { tenant: { schema } });
-    res.json({ blocos, produtos, total_produtos: produtos.length });
+    const { blocos, produtos, modo } = await motor.processar(query, { tenant: { schema } });
+    res.json({ blocos, produtos, total_produtos: produtos.length, modo });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

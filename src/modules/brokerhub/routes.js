@@ -32,8 +32,8 @@ router.post('/pergunta', async (req, res) => {
 
   const tenantId = req.ctx.farmaciaId;
   try {
-    const { blocos, produtos } = await motor.processar(query, { tenant: { tenantId } });
-    res.json({ blocos, produtos, total_produtos: produtos.length });
+    const { blocos, produtos, modo } = await motor.processar(query, { tenant: { tenantId } });
+    res.json({ blocos, produtos, total_produtos: produtos.length, modo });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

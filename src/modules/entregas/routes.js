@@ -42,8 +42,8 @@ router.post('/pergunta', async (req, res) => {
       providerId = p[0]?.id || null;
     }
     const tenant = { userId: req.ctx.usuarioId, userType: u?.userType || 'ADMIN', providerId };
-    const { blocos, produtos } = await motor.processar(query, { tenant });
-    res.json({ blocos, produtos, total_produtos: produtos.length });
+    const { blocos, produtos, modo } = await motor.processar(query, { tenant });
+    res.json({ blocos, produtos, total_produtos: produtos.length, modo });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

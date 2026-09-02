@@ -314,24 +314,25 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
   }
 
   // ════ Ponto de entrada do motor ══════════════════════════════════
+  const comModo = (r, modo) => { r.modo = modo; return r; };
   async function processar(frase, ctx) {
     if (API_KEY) {
       try {
         const r = await processarLLM(frase, ctx);
         // resposta com ferramenta executada (dados reais) -> usar
         const usouFerramenta = r.blocos.some(b => b.intencao !== 'resposta_llm') || r.produtos.length > 0;
-        if (usouFerramenta) return r;
+        if (usouFerramenta) return comModo(r, 'llm');
         // o LLM respondeu em texto livre (sem ferramenta): não confiar em
         // números; correr o fallback por regras que chama a ferramenta real.
         const padrao = await processarPadrao(frase, ctx);
-        if (padrao.blocos.some(b => b.dados) || padrao.produtos.length) return padrao;
+        if (padrao.blocos.some(b => b.dados) || padrao.produtos.length) return comModo(padrao, 'regras');
         // nada de dados no fallback -> aceitar a resposta conversacional do LLM
-        return r;
+        return comModo(r, 'llm');
       } catch (err) {
         console.error('LLM falhou, a usar motor padrão:', err.message);
       }
     }
-    return processarPadrao(frase, ctx);
+    return comModo(await processarPadrao(frase, ctx), 'regras');
   }
 
   return { processar, normalizar };
