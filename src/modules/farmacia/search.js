@@ -61,8 +61,9 @@ function colunaNormalizada(coluna) {
  * busca com tolerância a acentos e erros de digitação (pg_trgm),
  * devolve lista agrupada e ranqueada por relevância.
  */
-export async function buscarProdutos(stringUsuario, limite = 20) {
+export async function buscarProdutos(stringUsuario, limite = 20, farmaciaId = null) {
   const termos = extrairTermos(stringUsuario);
+  const filtroFarmacia = farmaciaId ? `"farmacia_id" = ${Number(farmaciaId)}` : 'true';
 
   // Frase sem termos úteis ("quero lista de produtos"): devolve os mais recentes
   if (termos.length === 0) {
@@ -71,7 +72,7 @@ export async function buscarProdutos(stringUsuario, limite = 20) {
              forma_farmaceutica, concentracao, requer_receita, controlado,
              is_ativo, 0 AS relevancia
       FROM produtos_produto
-      WHERE is_ativo = true
+      WHERE is_ativo = true AND ${filtroFarmacia}
       ORDER BY data_criacao DESC, nome ASC
       LIMIT ${limite}
     `);
@@ -114,7 +115,7 @@ export async function buscarProdutos(stringUsuario, limite = 20) {
       is_ativo,
       round(((${scoreParts.join(' + ')})::numeric), 2) AS relevancia
     FROM produtos_produto
-    WHERE is_ativo = true AND (${condicoes.join(' OR ')})
+    WHERE is_ativo = true AND ${filtroFarmacia} AND (${condicoes.join(' OR ')})
     ORDER BY relevancia DESC, nome ASC
     LIMIT ${limite}
   `;

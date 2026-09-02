@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+// Gerado a partir de public/index.html — NÃO editar manualmente.
+export const LANDING_HTML = `<!DOCTYPE html>
 <html lang="pt">
 <head>
 <meta charset="utf-8">
@@ -162,11 +163,11 @@ async function carregarSistemas() {
       c.rel = 'noopener';
       c.title = 'Abrir ' + s.nome + ' → ' + s.url;
     }
-    c.innerHTML = `
-      <div class="emoji">${s.emoji}</div>
-      <div class="nome">${esc(s.nome)}${s.url ? ' ↗' : ''}</div>
-      <div class="desc">${esc(s.desc)}</div>
-      <div class="estado ${s.implementado ? 'ativo' : 'breve'}">${s.implementado ? '● Disponível' : s.url ? '● Abrir sistema' : '○ Em breve'}</div>`;
+    c.innerHTML = \`
+      <div class="emoji">\${s.emoji}</div>
+      <div class="nome">\${esc(s.nome)}\${s.url ? ' ↗' : ''}</div>
+      <div class="desc">\${esc(s.desc)}</div>
+      <div class="estado \${s.implementado ? 'ativo' : 'breve'}">\${s.implementado ? '● Disponível' : s.url ? '● Abrir sistema' : '○ Em breve'}</div>\`;
     if (!s.url) c.onclick = () => escolherSistema(s);
     elGrid.appendChild(c);
   });
@@ -295,31 +296,31 @@ function renderDados(container, dados) {
     const entradas = Object.entries(dados).filter(([, v]) => v != null && typeof v !== 'object');
     if (entradas.length) {
       container.innerHTML = '<div class="kpi-grid">' + entradas.map(([k, v]) =>
-        `<div class="kpi"><div class="valor">${esc(String(v))}</div><div class="rotulo">${esc(cap(String(k).replace(/_/g, ' ')))}</div></div>`
+        \`<div class="kpi"><div class="valor">\${esc(String(v))}</div><div class="rotulo">\${esc(cap(String(k).replace(/_/g, ' ')))}</div></div>\`
       ).join('') + '</div>';
     }
   }
 }
 
 function renderVenda(container, d) {
-  container.innerHTML = `
+  container.innerHTML = \`
     <div class="kpi-grid">
-      <div class="kpi"><div class="valor">${esc(d.numero_pedido)}</div><div class="rotulo">Nº pedido</div></div>
-      <div class="kpi"><div class="valor">${MZN(d.total)}</div><div class="rotulo">Total</div></div>
-      <div class="kpi"><div class="valor">${esc(d.forma_pagamento)}</div><div class="rotulo">Pagamento</div></div>
-    </div>`;
+      <div class="kpi"><div class="valor">\${esc(d.numero_pedido)}</div><div class="rotulo">Nº pedido</div></div>
+      <div class="kpi"><div class="valor">\${MZN(d.total)}</div><div class="rotulo">Total</div></div>
+      <div class="kpi"><div class="valor">\${esc(d.forma_pagamento)}</div><div class="rotulo">Pagamento</div></div>
+    </div>\`;
   renderTabela(container, d.itens, ['Produto', 'Qtd', 'Preço', 'Subtotal'],
     r => [esc(r.produto), r.quantidade, MZN(r.preco_unitario), MZN(r.subtotal)], true);
 }
 
 function renderVendas(container, d) {
   const t = d.totais;
-  container.innerHTML = `
+  container.innerHTML = \`
     <div class="kpi-grid">
-      <div class="kpi"><div class="valor">${t.pedidos}</div><div class="rotulo">Pedidos</div></div>
-      <div class="kpi"><div class="valor">${MZN(t.total)}</div><div class="rotulo">Total faturado</div></div>
-      <div class="kpi"><div class="valor">${MZN(t.ticket_medio)}</div><div class="rotulo">Ticket médio</div></div>
-    </div>`;
+      <div class="kpi"><div class="valor">\${t.pedidos}</div><div class="rotulo">Pedidos</div></div>
+      <div class="kpi"><div class="valor">\${MZN(t.total)}</div><div class="rotulo">Total faturado</div></div>
+      <div class="kpi"><div class="valor">\${MZN(t.ticket_medio)}</div><div class="rotulo">Ticket médio</div></div>
+    </div>\`;
   if (d.por_forma_pagamento.length) {
     renderTabela(container, d.por_forma_pagamento, ['Forma de pagamento', 'Pedidos', 'Total'],
       r => [esc(cap(r.forma_pagamento)), r.pedidos, MZN(r.total)], true);
@@ -329,26 +330,26 @@ function renderVendas(container, d) {
 function renderEstoque(container, dados) {
   if (!dados.length) { container.innerHTML = '<p>✅ Nenhum produto abaixo do mínimo.</p>'; return; }
   renderTabela(container, dados, ['Produto', 'Qtd', 'Mínimo', 'Preço'],
-    r => [`<span class="alerta">${esc(r.nome)}</span>`, r.quantidade, r.quantidade_minima, MZN(r.preco_venda)], false,
+    r => [\`<span class="alerta">\${esc(r.nome)}</span>\`, r.quantidade, r.quantidade_minima, MZN(r.preco_venda)], false,
     r => verProduto(r.id, r.nome));
 }
 
 function renderClientes(container, d) {
-  container.innerHTML = `
+  container.innerHTML = \`
     <div class="kpi-grid">
-      <div class="kpi"><div class="valor">${d.clientes}</div><div class="rotulo">Clientes registados</div></div>
-      <div class="kpi"><div class="valor">${d.novos_30d}</div><div class="rotulo">Novos (30 dias)</div></div>
-    </div>`;
+      <div class="kpi"><div class="valor">\${d.clientes}</div><div class="rotulo">Clientes registados</div></div>
+      <div class="kpi"><div class="valor">\${d.novos_30d}</div><div class="rotulo">Novos (30 dias)</div></div>
+    </div>\`;
 }
 
 function renderTabela(container, linhas, cab, fmt, numCols = false, onClick = null) {
   const tb = document.createElement('table');
   tb.className = 'tab';
-  tb.innerHTML = '<thead><tr>' + cab.map((c, i) => `<th class="${i > 0 ? 'num' : ''}">${c}</th>`).join('') + '</tr></thead>';
+  tb.innerHTML = '<thead><tr>' + cab.map((c, i) => \`<th class="\${i > 0 ? 'num' : ''}">\${c}</th>\`).join('') + '</tr></thead>';
   const corpo = document.createElement('tbody');
   linhas.forEach(r => {
     const tr = document.createElement('tr');
-    tr.innerHTML = fmt(r).map((c, i) => `<td class="${i > 0 ? 'num' : ''}">${c}</td>`).join('');
+    tr.innerHTML = fmt(r).map((c, i) => \`<td class="\${i > 0 ? 'num' : ''}">\${c}</td>\`).join('');
     if (onClick) { tr.style.cursor = 'pointer'; tr.onclick = () => onClick(r); }
     corpo.appendChild(tr);
   });
@@ -365,7 +366,7 @@ function renderProdutos(produtos, abaixoDeRelatorio) {
   produtos.forEach(p => {
     const c = document.createElement('div');
     c.className = 'cartao';
-    c.innerHTML = `<div class="nome">${esc(p.nome)}</div><div class="generico">${esc(p.nome_generico || '')}</div>`;
+    c.innerHTML = \`<div class="nome">\${esc(p.nome)}</div><div class="generico">\${esc(p.nome_generico || '')}</div>\`;
     c.onclick = () => verProduto(p.id, p.nome);
     grid.appendChild(c);
   });
@@ -388,17 +389,17 @@ async function verProduto(id, nome) {
   ].filter(l => l[1] !== '' && l[1] != null);
   let est = '';
   if (p.estoque && p.estoque.length) {
-    est = p.estoque.map(e => `
-      <tr><td>Preço</td><td><strong>${MZN(e.preco_venda)}</strong>${e.em_promocao && e.preco_promocional ? ' (promoção: ' + MZN(e.preco_promocional) + ')' : ''}</td></tr>
-      <tr><td>Quantidade em estoque</td><td class="${e.quantidade == 0 ? 'alerta' : ''}">${e.quantidade}</td></tr>
-      <tr><td>Lote / Validade</td><td>${e.lote || '—'} / ${e.data_validade ? e.data_validade.slice(0, 10) : '—'}</td></tr>`).join('');
+    est = p.estoque.map(e => \`
+      <tr><td>Preço</td><td><strong>\${MZN(e.preco_venda)}</strong>\${e.em_promocao && e.preco_promocional ? ' (promoção: ' + MZN(e.preco_promocional) + ')' : ''}</td></tr>
+      <tr><td>Quantidade em estoque</td><td class="\${e.quantidade == 0 ? 'alerta' : ''}">\${e.quantidade}</td></tr>
+      <tr><td>Lote / Validade</td><td>\${e.lote || '—'} / \${e.data_validade ? e.data_validade.slice(0, 10) : '—'}</td></tr>\`).join('');
   } else est = '<tr><td>Estoque</td><td class="alerta">Sem estoque disponível</td></tr>';
-  elResp.innerHTML = `
+  elResp.innerHTML = \`
     <div class="detalhe">
-      <h2>${esc(p.nome)}</h2><p class="produtos-titulo" style="margin-bottom:14px">Produto #${p.id}</p>
-      <table class="tab">${linhas.map(l => `<tr><td style="color:var(--cinza);width:180px">${l[0]}</td><td>${esc(String(l[1]))}</td></tr>`).join('')}${est}</table>
+      <h2>\${esc(p.nome)}</h2><p class="produtos-titulo" style="margin-bottom:14px">Produto #\${p.id}</p>
+      <table class="tab">\${linhas.map(l => \`<tr><td style="color:var(--cinza);width:180px">\${l[0]}</td><td>\${esc(String(l[1]))}</td></tr>\`).join('')}\${est}</table>
       <button class="voltar" onclick="perguntar()">← Voltar</button>
-    </div>`;
+    </div>\`;
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -428,3 +429,4 @@ elPass.addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 </script>
 </body>
 </html>
+`;
