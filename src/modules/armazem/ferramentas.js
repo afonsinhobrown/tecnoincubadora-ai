@@ -26,13 +26,13 @@ function janelaTempo(periodo) {
 }
 
 async function resumoVendas(periodo, userId) {
-  const inicio = janelaTempo(periodo);
+  const inicio = periodo === 'total' ? null : janelaTempo(periodo);
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum(total),0)::numeric(12,2) AS total,
            coalesce(avg(total),0)::numeric(12,2) AS ticket_medio
     FROM invoices
-    WHERE user_id = $1 AND status NOT IN ('CANCELLED','cancelado') AND created_at >= $2
+    WHERE user_id = $1 AND status NOT IN ('CANCELLED','cancelado') AND (\$2::timestamptz IS NULL OR created_at >= \$2)
   `, [userId, inicio]);
   return { totais, por_forma_pagamento: [] };
 }
@@ -112,7 +112,7 @@ async function detalheProduto(id, userId) {
 
 export const FERRAMENTAS_ARMAZEM = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, empresaDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', empresaDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', empresaDe(p)),
   top_produtos: (p = {}) => topProdutos(empresaDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(empresaDe(p)),
   clientes: (p = {}) => resumoClientes(empresaDe(p)),

@@ -35,7 +35,7 @@ async function resumoVendas(periodo, ctx) {
            coalesce(sum("totalAmount"),0)::numeric(12,2) AS total,
            coalesce(avg("totalAmount"),0)::numeric(12,2) AS ticket_medio
     FROM "Order"
-    WHERE status NOT IN ('CANCELLED','cancelled') AND "createdAt" >= $1 ${fp.where}
+    WHERE status NOT IN ('CANCELLED','cancelled') AND (\$1::timestamptz IS NULL OR "createdAt" >= \$1) ${fp.where}
   `, [inicio, ...fp.params]);
   return { totais, por_forma_pagamento: [] };
 }
@@ -81,7 +81,7 @@ async function estafetas() {
 }
 
 export const FERRAMENTAS_ENTREGAS = {
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', p),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', p),
   top_produtos: (p = {}) => topProdutos(p),
   clientes: (p = {}) => clientes(p),
   lojas: (p = {}) => lojas(p),

@@ -26,20 +26,22 @@ function janelaTempo(periodo) {
 }
 
 async function resumoVendas(periodo, salonId) {
-  const inicio = janelaTempo(periodo);
+  const inicio = periodo === 'total' ? null : janelaTempo(periodo);
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum(total),0)::numeric(12,2) AS total,
            coalesce(avg(total),0)::numeric(12,2) AS ticket_medio
     FROM "Invoices"
-    WHERE "SalonId" = $1 AND status <> 'voided' AND "paymentStatus" = 'paid' AND "createdAt" >= $2
+    WHERE "SalonId" = $1 AND status <> 'voided' AND "paymentStatus" = 'paid'
+      AND ($2::timestamptz IS NULL OR "createdAt" >= $2)
   `, [salonId, inicio]);
   const porForma = await sql(`
     SELECT coalesce("paymentMethod",'—') AS forma_pagamento,
            count(*)::int AS pedidos,
            coalesce(sum(total),0)::numeric(12,2) AS total
     FROM "Invoices"
-    WHERE "SalonId" = $1 AND status <> 'voided' AND "paymentStatus" = 'paid' AND "createdAt" >= $2
+    WHERE "SalonId" = $1 AND status <> 'voided' AND "paymentStatus" = 'paid'
+      AND ($2::timestamptz IS NULL OR "createdAt" >= $2)
     GROUP BY "paymentMethod" ORDER BY total DESC
   `, [salonId, inicio]);
   return { totais, por_forma_pagamento: porForma };
@@ -109,13 +111,70 @@ async function detalheProduto(id, salonId) {
   return { ...p[0], estoque: p[0].quantidade ? [{ quantidade: p[0].quantidade, preco_venda: p[0].preco_venda }] : [] };
 }
 
+// Agenda/agendamentos por estado
+async function agenda(salonId) {
+  const [totais] = await sql(`
+    SELECT count(*)::int AS total,
+           count(*) FILTER (WHERE status = 'scheduled')::int AS marcados,
+           count(*) FILTER (WHERE status = 'in_service')::int AS em_servico,
+           count(*) FILTER (WHERE status = 'completed')::int AS concluidos
+    FROM "Appointments"
+    WHERE "SalonId" = $1
+  `, [salonId]);
+  const lista = await sql(`
+    SELECT a.id, a.date AS data, a."startTime" AS inicio, a.status AS estado,
+           a.price AS valor, c.name AS cliente, s.name AS servico
+    FROM "Appointments" a
+    LEFT JOIN "Clients" c ON c.id = a."ClientId"
+    LEFT JOIN "Services" s ON s.id = a."ServiceId"
+    WHERE a."SalonId" = $1
+    ORDER BY a.date DESC, a."startTime" DESC
+    LIMIT 50
+  `, [salonId]);
+  return { totais, lista };
+}
+
+// Serviços e preços
+async function servicos(salonId) {
+  return sql(`
+    SELECT id, name AS nome, price AS preco, duration AS duracao_min,
+           active AS ativo
+    FROM "Services"
+    WHERE "SalonId" = $1
+    ORDER BY name ASC
+    LIMIT 100
+  `, [salonId]);
+}
+
+// Profissionais
+async function profissionais(salonId) {
+  const [totais] = await sql(`
+    SELECT count(*)::int AS profissionais,
+           count(*) FILTER (WHERE active = true)::int AS ativos
+    FROM "Professionals"
+    WHERE "SalonId" = $1
+  `, [salonId]);
+  const lista = await sql(`
+    SELECT id, name AS nome, role AS funcao, active AS ativo,
+           coalesce(commissionRate,0) AS comissao
+    FROM "Professionals"
+    WHERE "SalonId" = $1
+    ORDER BY name ASC
+    LIMIT 100
+  `, [salonId]);
+  return { totais, lista };
+}
+
 export const FERRAMENTAS_XONGUILE = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, salaoDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', salaoDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', salaoDe(p)),
   top_produtos: (p = {}) => topProdutos(salaoDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(salaoDe(p)),
   clientes: (p = {}) => resumoClientes(salaoDe(p)),
-  detalhe_produto: (p = {}) => detalheProduto(p.id, salaoDe(p))
+  detalhe_produto: (p = {}) => detalheProduto(p.id, salaoDe(p)),
+  agenda: (p = {}) => agenda(salaoDe(p)),
+  servicos: (p = {}) => servicos(salaoDe(p)),
+  profissionais: (p = {}) => profissionais(salaoDe(p))
 };
 
 export async function executarFerramentaXonguile(nome, params = {}) {

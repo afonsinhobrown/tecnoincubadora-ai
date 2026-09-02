@@ -26,20 +26,20 @@ function janelaTempo(periodo) {
 }
 
 async function resumoVendas(periodo, companyId) {
-  const inicio = janelaTempo(periodo);
+  const inicio = periodo === 'total' ? null : janelaTempo(periodo);
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum("totalAmount"),0)::numeric(12,2) AS total,
            coalesce(avg("totalAmount"),0)::numeric(12,2) AS ticket_medio
     FROM "Sale"
-    WHERE "companyId" = $1 AND date >= $2
+    WHERE "companyId" = $1 AND (\$2::timestamptz IS NULL OR date >= \$2)
   `, [companyId, inicio]);
   const porForma = await sql(`
     SELECT coalesce("paymentMethod",'—') AS forma_pagamento,
            count(*)::int AS pedidos,
            coalesce(sum("totalAmount"),0)::numeric(12,2) AS total
     FROM "Sale"
-    WHERE "companyId" = $1 AND date >= $2
+    WHERE "companyId" = $1 AND (\$2::timestamptz IS NULL OR date >= \$2)
     GROUP BY "paymentMethod" ORDER BY total DESC
   `, [companyId, inicio]);
   return { totais, por_forma_pagamento: porForma };
@@ -113,7 +113,7 @@ async function detalheProduto(id, companyId) {
 
 export const FERRAMENTAS_MACHAMBA = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, empresaDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', empresaDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', empresaDe(p)),
   top_produtos: (p = {}) => topProdutos(empresaDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(empresaDe(p)),
   clientes: (p = {}) => resumoClientes(empresaDe(p)),

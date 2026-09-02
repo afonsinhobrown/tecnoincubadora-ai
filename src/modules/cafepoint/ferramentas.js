@@ -26,13 +26,13 @@ function janelaTempo(periodo) {
 }
 
 async function resumoVendas(periodo, restaurantId) {
-  const inicio = janelaTempo(periodo);
+  const inicio = periodo === 'total' ? null : janelaTempo(periodo);
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum("totalAmount"),0)::numeric(12,2) AS total,
            coalesce(avg("totalAmount"),0)::numeric(12,2) AS ticket_medio
     FROM "Order"
-    WHERE "restaurantId" = $1 AND status IN ('PAID','COMPLETED') AND "createdAt" >= $2
+    WHERE "restaurantId" = $1 AND status IN ('PAID','COMPLETED') AND (\$2::timestamptz IS NULL OR "createdAt" >= \$2)
   `, [restaurantId, inicio]);
   return { totais, por_forma_pagamento: [] };
 }
@@ -108,7 +108,7 @@ async function detalheProduto(id, restaurantId) {
 
 export const FERRAMENTAS_CAFEPOINT = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, restDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', restDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', restDe(p)),
   top_produtos: (p = {}) => topProdutos(restDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(restDe(p)),
   clientes: (p = {}) => resumoClientes(restDe(p)),

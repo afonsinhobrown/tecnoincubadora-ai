@@ -86,7 +86,7 @@ async function leads(tenantId) {
 }
 
 export const FERRAMENTAS_BROKERHUB = {
-  vendas: (p = {}) => carteira(p.periodo ?? '30d', tenantDe(p)),
+  vendas: (p = {}) => carteira(p.periodo ?? 'total', tenantDe(p)),
   clientes: (p = {}) => clientes(tenantDe(p)),
   top_produtos: (p = {}) => topClientes(tenantDe(p)),
   corretores: (p = {}) => corretores(tenantDe(p)),

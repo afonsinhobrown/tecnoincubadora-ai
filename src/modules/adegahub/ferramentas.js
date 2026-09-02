@@ -26,13 +26,13 @@ function janelaTempo(periodo) {
 }
 
 async function resumoVendas(periodo, tenantId) {
-  const inicio = janelaTempo(periodo);
+  const inicio = periodo === 'total' ? null : janelaTempo(periodo);
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum(total_amount),0)::numeric(12,2) AS total,
            coalesce(avg(total_amount),0)::numeric(12,2) AS ticket_medio
     FROM sales
-    WHERE tenant_id = $1 AND status NOT IN ('cancelled','CANCELLED') AND created_at >= $2
+    WHERE tenant_id = $1 AND status NOT IN ('cancelled','CANCELLED') AND (\$2::timestamptz IS NULL OR created_at >= \$2)
   `, [tenantId, inicio]);
   const porForma = await sql(`
     SELECT coalesce(payment_method,'—') AS forma_pagamento,
@@ -41,7 +41,7 @@ async function resumoVendas(periodo, tenantId) {
     FROM payments p
     JOIN sales s ON s.id = p.sale_id
     WHERE s.tenant_id = $1 AND s.status NOT IN ('cancelled','CANCELLED') AND p.status = 'captured'
-      AND s.created_at >= $2
+      AND (\$2::timestamptz IS NULL OR s.created_at >= \$2)
     GROUP BY payment_method ORDER BY total DESC
   `, [tenantId, inicio]);
   return { totais, por_forma_pagamento: porForma };
@@ -118,7 +118,7 @@ async function detalheProduto(id, tenantId) {
 
 export const FERRAMENTAS_ADEGAHUB = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, tenantDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', tenantDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', tenantDe(p)),
   top_produtos: (p = {}) => topProdutos(tenantDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(tenantDe(p)),
   clientes: (p = {}) => resumoClientes(tenantDe(p)),

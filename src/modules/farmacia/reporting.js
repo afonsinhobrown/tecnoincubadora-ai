@@ -19,7 +19,7 @@ function janelaTempo(periodo) {
 }
 
 export async function resumoVendas(periodo, farmaciaId) {
-  const inicio = janelaTempo(periodo);
+  const inicio = periodo === 'total' ? null : janelaTempo(periodo);
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum(total),0)::numeric(12,2) AS total,

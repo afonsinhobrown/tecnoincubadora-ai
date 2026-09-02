@@ -26,13 +26,13 @@ function janelaTempo(periodo) {
 }
 
 async function resumoVendas(periodo, escolaId) {
-  const inicio = janelaTempo(periodo);
+  const inicio = periodo === 'total' ? null : janelaTempo(periodo);
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum("valorPago"),0)::numeric(12,2) AS total,
            coalesce(avg("valorPago"),0)::numeric(12,2) AS ticket_medio
     FROM "Mensalidade"
-    WHERE "escolaId" = $1 AND "valorPago" > 0 AND "updatedAt" >= $2
+    WHERE "escolaId" = $1 AND "valorPago" > 0 AND (\$2::timestamptz IS NULL OR "updatedAt" >= \$2)
   `, [escolaId, inicio]);
   return { totais, por_forma_pagamento: [] };
 }
@@ -79,7 +79,7 @@ async function buscarAluno(termos, escolaId) {
 }
 
 export const FERRAMENTAS_SMARTSCHOOL = {
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', escolaDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', escolaDe(p)),
   clientes: (p = {}) => clientes(escolaDe(p)),
   turmas: (p = {}) => turmas(escolaDe(p)),
   buscar_aluno: (p = {}) => buscarAluno(p.termos, escolaDe(p))

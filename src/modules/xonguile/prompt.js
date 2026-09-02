@@ -25,10 +25,13 @@ export const PROMPT_XONGUILE = {
 
   ferramentas: {
     buscar_produtos: 'busca de produtos por nome, tolerante a erros',
-    vendas: 'resumo de vendas e faturação por período (hoje | semana | mes | 30d)',
+    vendas: 'resumo de vendas e faturação por período (hoje | semana | mes | total)',
     top_produtos: 'serviços e produtos mais vendidos',
     estoque_baixo: 'produtos abaixo do mínimo ou esgotados',
-    clientes: 'contagem de clientes registados',
+    clientes: 'lista e contagem de clientes',
+    agenda: 'agendamentos por estado (marcado, em serviço, concluído)',
+    servicos: 'lista de serviços e preços',
+    profissionais: 'profissionais do salão e a sua produção',
     detalhe_produto: 'ficha de um produto com preço e estoque'
   },
 
@@ -59,8 +62,29 @@ export const PROMPT_XONGUILE = {
       id: 'clientes',
       ferramenta: 'clientes',
       titulo: '👥 Clientes',
-      frases: ['quantos clientes tenho', 'clientes novos', 'clientes registados'],
+      frases: ['quantos clientes tenho', 'clientes novos', 'clientes registados', 'lista de clientes'],
       palavras: ['clientes', 'cliente']
+    },
+    {
+      id: 'agenda',
+      ferramenta: 'agenda',
+      titulo: '📅 Agenda',
+      frases: ['agenda de hoje', 'agendamentos', 'agendamentos marcados', 'agenda do dia', 'clientes em serviço'],
+      palavras: ['agenda', 'agendamento', 'agendamentos', 'marcado', 'marcados', 'em serviço', 'em servico', 'reserva', 'reservas']
+    },
+    {
+      id: 'servicos',
+      ferramenta: 'servicos',
+      titulo: '💆 Serviços',
+      frases: ['quais serviços', 'lista de serviços', 'serviços disponíveis', 'preços dos serviços'],
+      palavras: ['serviços', 'servicos', 'serviço', 'servico']
+    },
+    {
+      id: 'profissionais',
+      ferramenta: 'profissionais',
+      titulo: '🧑‍🎨 Profissionais',
+      frases: ['quantos profissionais', 'profissionais do salão', 'lista de profissionais'],
+      palavras: ['profissionais', 'profissional', 'funcionários', 'funcionarios']
     }
   ],
 
