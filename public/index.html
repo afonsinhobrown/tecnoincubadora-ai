@@ -507,6 +507,7 @@ function iniciarChat(d) {
   SESSAO = { usuario: d.usuario || null, farmacia: d.farmacia || null };
   elSessaoNome.textContent = s.emoji + ' ' + s.nome + ' · ' +
     ((d.farmacia && d.farmacia.nome) || (d.usuario && (d.usuario.nome || d.usuario.email)) || 'sessão iniciada');
+  if (s.slug === 'ddgei') elSessaoNome.textContent = 'DDGEI';
   document.getElementById('btn-admin').style.display = (d.usuario && d.usuario.tipo_usuario === 'SUPERADMIN') ? '' : 'none';
   renderExemplos(s.exemplos || EXEMPLOS_PADRAO);
   elEstado.className = '';
