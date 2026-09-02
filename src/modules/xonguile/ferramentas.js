@@ -5,6 +5,7 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 import { neon } from '@neondatabase/serverless';
+import { extrairCriterio } from '../../criterios/index.js';
 
 const sql = neon(process.env.XONGUILE_DATABASE_URL);
 
@@ -111,15 +112,28 @@ async function detalheProduto(id, salonId) {
   return { ...p[0], estoque: p[0].quantidade ? [{ quantidade: p[0].quantidade, preco_venda: p[0].preco_venda }] : [] };
 }
 
-// Agenda/agendamentos por estado
-async function agenda(salonId) {
+// Agenda/agendamentos por estado (global vs específico)
+async function agenda(salonId, consulta) {
+  const dict = [
+    { rotulo: 'marcados', rotuloCurto: 'marcados', valor: 'scheduled', sql: `status = 'scheduled'` },
+    { rotulo: 'em serviço', rotuloCurto: 'em servico', valor: 'in_service', sql: `status = 'in_service'` },
+    { rotulo: 'em atendimento', rotuloCurto: 'em atendimento', valor: 'in_service', sql: `status = 'in_service'` },
+    { rotulo: 'concluidos', rotuloCurto: 'concluidos', valor: 'completed', sql: `status = 'completed'` },
+    { rotulo: 'concluidos', rotuloCurto: 'concluidos', valor: 'completed', sql: `status = 'completed'` },
+    { rotulo: 'concluidos', rotuloCurto: 'concluidos', valor: 'completed', sql: `status = 'completed'` }
+  ];
+  const c = extrairCriterio(consulta || '', dict.map(d => ({ rotulo: d.rotulo, rotuloCurto: d.rotuloCurto, valor: d.valor })));
+  const especifico = !c.global;
+  const item = especifico ? dict.find(d => d.valor === c.criterio.valor) : null;
+  const cond = item ? ` AND ${item.sql}` : '';
+
   const [totais] = await sql(`
     SELECT count(*)::int AS total,
            count(*) FILTER (WHERE status = 'scheduled')::int AS marcados,
            count(*) FILTER (WHERE status = 'in_service')::int AS em_servico,
            count(*) FILTER (WHERE status = 'completed')::int AS concluidos
     FROM "Appointments"
-    WHERE "SalonId" = $1
+    WHERE "SalonId" = $1${cond}
   `, [salonId]);
   const lista = await sql(`
     SELECT a.id, a.date AS data, a."startTime" AS inicio, a.status AS estado,
@@ -127,11 +141,11 @@ async function agenda(salonId) {
     FROM "Appointments" a
     LEFT JOIN "Clients" c ON c.id = a."ClientId"
     LEFT JOIN "Services" s ON s.id = a."ServiceId"
-    WHERE a."SalonId" = $1
+    WHERE a."SalonId" = $1${cond}
     ORDER BY a.date DESC, a."startTime" DESC
     LIMIT 50
   `, [salonId]);
-  return { totais, lista };
+  return { totais, pedido: especifico ? 'especifico' : 'global', filtro: item ? { estado: item.valor } : undefined, lista };
 }
 
 // Serviços e preços
@@ -172,7 +186,7 @@ export const FERRAMENTAS_XONGUILE = {
   estoque_baixo: (p = {}) => estoqueBaixo(salaoDe(p)),
   clientes: (p = {}) => resumoClientes(salaoDe(p)),
   detalhe_produto: (p = {}) => detalheProduto(p.id, salaoDe(p)),
-  agenda: (p = {}) => agenda(salaoDe(p)),
+  agenda: (p = {}) => agenda(salaoDe(p), p.consulta),
   servicos: (p = {}) => servicos(salaoDe(p)),
   profissionais: (p = {}) => profissionais(salaoDe(p))
 };
