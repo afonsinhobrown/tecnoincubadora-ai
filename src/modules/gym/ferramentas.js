@@ -28,23 +28,29 @@ function janelaTempo(periodo) {
   return inicio;
 }
 
-async function resumoVendas(periodo, gymId) {
+async function resumoVendas(periodo, gymId, consulta) {
+  const formas = await sql(`SELECT DISTINCT payment_method FROM invoices WHERE payment_method IS NOT NULL AND payment_method<>''`);
+  const dict = formas.map(f => ({ rotulo: String(f.payment_method).toLowerCase(), rotuloCurto: String(f.payment_method).toLowerCase(), valor: f.payment_method, sql: `payment_method = '${String(f.payment_method).replace(/'/g, "''")}'` }));
+  const c = extrairCriterio(consulta || '', dict.map(d => ({ rotulo: d.rotulo, rotuloCurto: d.rotuloCurto, valor: d.valor })));
+  const especifico = !c.global;
+  const item = especifico ? dict.find(d => d.valor === c.criterio.valor) : null;
+  const formaCond = item ? ` AND ${item.sql}` : '';
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum(amount),0)::numeric(12,2) AS total,
            coalesce(avg(amount),0)::numeric(12,2) AS ticket_medio
     FROM invoices
-    WHERE ($1::text IS NULL OR gym_id::text = $1) AND status NOT IN ('voided','CANCELLED','cancelado')
+    WHERE ($1::text IS NULL OR gym_id::text = $1) AND status NOT IN ('voided','CANCELLED','cancelado')${formaCond}
   `, [gymId]);
   const porForma = await sql(`
     SELECT coalesce(payment_method,'—') AS forma_pagamento,
            count(*)::int AS pedidos,
            coalesce(sum(amount),0)::numeric(12,2) AS total
     FROM invoices
-    WHERE ($1::text IS NULL OR gym_id::text = $1) AND status NOT IN ('voided','CANCELLED','cancelado')
+    WHERE ($1::text IS NULL OR gym_id::text = $1) AND status NOT IN ('voided','CANCELLED','cancelado')${formaCond}
     GROUP BY payment_method ORDER BY total DESC
   `, [gymId]);
-  return { totais, por_forma_pagamento: porForma };
+  return { totais, por_forma_pagamento: porForma, pedido: especifico ? 'especifico' : 'global', filtro: item ? { forma_pagamento: item.valor } : undefined };
 }
 
 async function topProdutos(gymId) {
@@ -254,7 +260,7 @@ async function acessos(periodo, gymId) {
 
 export const FERRAMENTAS_GYM = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, p.isSuperAdmin ? null : gymDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', p.isSuperAdmin ? null : gymDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', p.isSuperAdmin ? null : gymDe(p), p.consulta),
   top_produtos: (p = {}) => topProdutos(p.isSuperAdmin ? null : gymDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(p.isSuperAdmin ? null : gymDe(p)),
   clientes: (p = {}) => resumoClientes(p.isSuperAdmin ? null : gymDe(p), p.consulta),
