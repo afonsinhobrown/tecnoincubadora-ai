@@ -23,7 +23,7 @@ router.post('/login', async (req, res) => {
 
 function exigirAutenticacao(req, res, next) {
   const ctx = contextoDoPedido(req);
-  if (!ctx || !ctx.farmaciaId) return res.status(401).json({ error: 'Não autenticado. Faça login.' });
+  if (!ctx || (!ctx.farmaciaId && !ctx.isSuperAdmin)) return res.status(401).json({ error: 'Não autenticado. Faça login.' });
   req.ctx = ctx;
   next();
 }

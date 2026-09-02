@@ -1,6 +1,6 @@
 import express from 'express';
 import { SISTEMAS, sistemaPorSlug } from '../../sistemas.js';
-import { login as loginFarmacia } from '../../auth/index.js';
+import { login as loginFarmacia, isSuperAdminCredentials, assinarSuperAdminToken } from '../../auth/index.js';
 import { loginXonguile } from '../xonguile/auth.js';
 import { loginCafepoint } from '../cafepoint/auth.js';
 import { loginArmazem } from '../armazem/auth.js';
@@ -32,6 +32,15 @@ router.post('/:slug/login', async (req, res) => {
 
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email e password são obrigatórios' });
+
+  // Superadmin da ferramenta: acesso ilimitado a qualquer sistema
+  if (isSuperAdminCredentials(email, password)) {
+    return res.json({
+      token: assinarSuperAdminToken(),
+      usuario: { id: 'superadmin', email, nome: 'Superadmin', tipo_usuario: 'SUPERADMIN' },
+      farmacia: { id: null, nome: 'Superadmin (todos os tenants)' }
+    });
+  }
 
   try {
     switch (sistema.slug) {

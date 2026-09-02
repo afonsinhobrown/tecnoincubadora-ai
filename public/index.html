@@ -163,6 +163,7 @@
     <div id="sessao-info">
       <span class="nome" id="sessao-nome"></span>
       <button class="voltar-link" onclick="sair()">Terminar sessão</button>
+      <button id="btn-admin" style="display:none; background:#7c3aed; color:#fff; border:0; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:.8rem;" onclick="mostrarAdmin()">👑 Painel Superadmin</button>
       <button id="btn-pdf" onclick="baixarPDF()" title="Exportar a resposta atual em PDF">⬇ PDF</button>
       <button id="btn-excel" onclick="baixarExcel()" title="Exportar os resultados em Excel/CSV">⬇ Excel</button>
       <button id="btn-wa" onclick="partilharWhatsapp()" title="Partilhar por WhatsApp">WhatsApp</button>
@@ -182,6 +183,17 @@
     <div id="modo-info"></div>
     <div id="pdf-header"></div>
     <div id="resposta"></div>
+  </section>
+
+  <!-- Vista Superadmin: gestão de licenças -->
+  <section id="view-admin" style="display:none">
+    <button class="voltar-link" onclick="mostrarVista('chat')">← Voltar ao chat</button>
+    <h2 style="color:var(--azul); margin-bottom:10px;">👑 Subscritores e Licenças</h2>
+    <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+      <button class="voltar-link" style="background:var(--azul); color:#fff; border-color:var(--azul);" onclick="carregarSubscritores()">↻ Atualizar</button>
+      <span id="admin-info" style="font-size:.85rem; color:var(--cinza); align-self:center;"></span>
+    </div>
+    <div id="admin-lista"></div>
   </section>
 </main>
 
@@ -216,10 +228,56 @@ const MZN = v => Number(v).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })
 function getToken() { return localStorage.getItem('gf_token'); }
 function getSistema() { try { return JSON.parse(localStorage.getItem('gf_sistema')); } catch { return null; } }
 
+const elAdmin = document.getElementById('view-admin');
 function mostrarVista(nome) {
   elLanding.style.display = nome === 'landing' ? '' : 'none';
   elLogin.style.display = nome === 'login' ? '' : 'none';
   elChat.style.display = nome === 'chat' ? '' : 'none';
+  elAdmin.style.display = nome === 'admin' ? '' : 'none';
+}
+function mostrarAdmin() { mostrarVista('admin'); carregarSubscritores(); }
+async function carregarSubscritores() {
+  const token = getToken();
+  const el = document.getElementById('admin-lista');
+  const info = document.getElementById('admin-info');
+  el.innerHTML = 'A carregar...'; info.textContent = '';
+  try {
+    const r = await fetch('/api/licencas', { headers: { 'Authorization': 'Bearer ' + token } });
+    const lista = await r.json();
+    if (!r.ok) throw new Error(lista.error || 'Erro');
+    if (!lista.length) { el.innerHTML = '<p class="vazio">Nenhum subscritor ainda.</p>'; return; }
+    info.textContent = lista.length + ' licenças';
+    let html = '<table class="tab"><thead><tr><th>Sistema</th><th>Tenant</th><th>Plano</th><th>Status</th><th>Prompts</th><th>Trial fim</th><th>Ações</th></tr></thead><tbody>';
+    lista.forEach(l => {
+      const trial = l.trial_fim ? new Date(l.trial_fim).toLocaleDateString('pt-PT') : '—';
+      html += `<tr><td>${esc(l.sistema_slug)}</td><td>${esc(l.tenant_nome||l.tenant_id)}</td><td>${esc(l.plano)}</td><td>${esc(l.status)}</td><td>${l.prompts_usados}/${l.plano==='pro'?'∞':(l.plano==='standard'?80:50)}</td><td>${trial}</td><td style="white-space:nowrap"><button onclick="acaoLicenca('${l.sistema_slug}','${l.tenant_id}','renovar')" style="font-size:.75rem; padding:4px 8px; border:1px solid var(--borda); border-radius:6px; cursor:pointer;">Renovar +10d</button> <button onclick="acaoLicenca('${l.sistema_slug}','${l.tenant_id}','bloquear')" style="font-size:.75rem; padding:4px 8px; border:1px solid #fca5a5; border-radius:6px; cursor:pointer; color:#991b1b;">${l.status==='blocked'?'Desbloquear':'Bloquear'}</button> <button onclick="acaoLicenca('${l.sistema_slug}','${l.tenant_id}','plano')" style="font-size:.75rem; padding:4px 8px; border:1px solid var(--borda); border-radius:6px; cursor:pointer;">Plano</button></td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<p class="alerta">Erro: ' + esc(e.message) + '</p>'; }
+}
+async function acaoLicenca(sistema, tenantId, acao) {
+  const token = getToken();
+  try {
+    let url = '', method = 'POST', body = {};
+    if (acao === 'renovar') { url = `/api/licencas/${sistema}/${tenantId}/renovar`; body = { dias: 10 }; }
+    else if (acao === 'bloquear') {
+      const r = await fetch('/api/licencas', { headers: { 'Authorization': 'Bearer ' + token } });
+      const lista = await r.json();
+      const lic = lista.find(x=> x.sistema_slug===sistema && x.tenant_id===tenantId);
+      const bloquear = lic?.status !== 'blocked';
+      url = `/api/licencas/${sistema}/${tenantId}/${bloquear?'bloquear':'desbloquear'}`; body = {};
+    }
+    else if (acao === 'plano') {
+      const novo = prompt('Novo plano (basico, standard, pro):');
+      if (!novo || !['basico','standard','pro'].includes(novo)) return;
+      url = `/api/licencas/${sistema}/${tenantId}`; method = 'PATCH'; body = { plano: novo };
+    }
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Erro');
+    carregarSubscritores();
+  } catch(e) { alert('Erro: ' + e.message); }
 }
 
 // ── Landing: lista os sistemas ──────────────────────────────────────
@@ -449,6 +507,7 @@ function iniciarChat(d) {
   SESSAO = { usuario: d.usuario || null, farmacia: d.farmacia || null };
   elSessaoNome.textContent = s.emoji + ' ' + s.nome + ' · ' +
     ((d.farmacia && d.farmacia.nome) || (d.usuario && (d.usuario.nome || d.usuario.email)) || 'sessão iniciada');
+  document.getElementById('btn-admin').style.display = (d.usuario && d.usuario.tipo_usuario === 'SUPERADMIN') ? '' : 'none';
   renderExemplos(s.exemplos || EXEMPLOS_PADRAO);
   elEstado.className = '';
   elEstado.textContent = 'Sessão iniciada.';

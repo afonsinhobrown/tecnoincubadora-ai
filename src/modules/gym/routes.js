@@ -21,7 +21,7 @@ router.post('/login', async (req, res) => {
 
 function exigirAutenticacao(req, res, next) {
   const ctx = contextoDoPedido(req);
-  if (!ctx || !ctx.farmaciaId) {
+  if (!ctx || (!ctx.farmaciaId && !ctx.isSuperAdmin)) {
     return res.status(401).json({ error: 'Não autenticado ou sem ginásio autorizado. Faça login.' });
   }
   req.ctx = ctx;
@@ -32,17 +32,18 @@ router.use(exigirAutenticacao);
 router.post('/pergunta', async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ error: 'query é obrigatório' });
-  const _lic = await verificarAcesso({ sistemaSlug: 'gymar', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
+  const isSuperAdmin = !!req.ctx.isSuperAdmin;
+  const _lic = await verificarAcesso({ sistemaSlug: 'gymar', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId || 'superadmin'), isSuperAdmin });
   if (!_lic.permitido) return res.status(402).json({ error: _lic.motivo, licenca: _lic, plano: _lic.plano });
 
-  const gymId = req.ctx.farmaciaId;
+  const gymId = isSuperAdmin ? null : req.ctx.farmaciaId;
   const ctx = {
-    tenant: { gymId },
-    buscarProdutos: (frase, limite) => bx(frase, gymId)
+    tenant: { gymId, isSuperAdmin },
+    buscarProdutos: (frase, limite) => bx(frase, gymId, isSuperAdmin)
   };
   try {
     const { blocos, produtos, modo } = await motor.processar(query, ctx);
-    await registrarUsoPrompt({ sistemaSlug: 'gymar', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
+    if (!isSuperAdmin) await registrarUsoPrompt({ sistemaSlug: 'gymar', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
     res.json({ blocos, produtos, total_produtos: produtos.length, modo, licenca: _lic });
   } catch (err) {
     res.status(500).json({ error: err.message });

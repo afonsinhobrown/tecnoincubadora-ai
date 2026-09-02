@@ -13,6 +13,8 @@ const sql = neon(process.env.FARMACIA_DATABASE_URL);
 
 const SEGREDO = process.env.AUTH_SECRET;
 const TOKEN_HORAS = Number(process.env.AUTH_TOKEN_HORAS || 12);
+const SUPERADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL || '').toLowerCase();
+const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD || '';
 
 function normalizarBase64(b64) {
   return Buffer.from(b64.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
@@ -28,6 +30,23 @@ export function verificarPasswordDjango(password, hashArmazenado) {
   const hashEsperado = normalizarBase64(hashB64);
   const derivado = pbkdf2Sync(password, salt, Number(iteracoes), hashEsperado.length, 'sha256');
   return derivado.length === hashEsperado.length && timingSafeEqual(derivado, hashEsperado);
+}
+
+// ── Superadmin da ferramenta (acesso a qualquer sistema, sem licença) ───
+export function isSuperAdminCredentials(email, password) {
+  if (!SUPERADMIN_EMAIL || !SUPERADMIN_PASSWORD) return false;
+  try {
+    const a = Buffer.from(String(email).toLowerCase());
+    const b = Buffer.from(SUPERADMIN_EMAIL);
+    const c = Buffer.from(String(password));
+    const d = Buffer.from(SUPERADMIN_PASSWORD);
+    return a.length === b.length && timingSafeEqual(a, b) && c.length === d.length && timingSafeEqual(c, d);
+  } catch { return false; }
+}
+export function assinarSuperAdminToken() {
+  const payload = Buffer.from(JSON.stringify({ super: true, exp: Date.now() + TOKEN_HORAS * 3600e3 })).toString('base64url');
+  const assinatura = createHmac('sha256', SEGREDO).update(payload).digest('base64url');
+  return `${payload}.${assinatura}`;
 }
 
 // ── Token assinado (sem estado) ─────────────────────────────────────
@@ -49,6 +68,7 @@ export function validarToken(token) {
   try {
     const dados = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     if (Date.now() > dados.exp) return null;
+    if (dados.super) return { usuarioId: 'superadmin', farmaciaId: null, isSuperAdmin: true };
     return { usuarioId: dados.uid, farmaciaId: dados.fid };
   } catch { return null; }
 }

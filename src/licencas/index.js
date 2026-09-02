@@ -16,7 +16,8 @@ const PLANOS = {
 
 const UNLIMITED_KEYWORDS = ['nachingweya','encubadora','tecnoincubadora','tecnoincubad','incubadora'];
 
-function isUnlimited({ sistemaSlug, tenantNome, userNome }) {
+function isUnlimited({ sistemaSlug, tenantNome, userNome, isSuperAdmin }) {
+  if (isSuperAdmin) return { unlimited: true, motivo: 'Superadmin — acesso ilimitado' };
   if (sistemaSlug === 'ddgei') return { unlimited: true, motivo: 'Licença Temporária gerida pelo desenvolvedor' };
   const hay = `${tenantNome||''} ${userNome||''}`.toLowerCase();
   if (UNLIMITED_KEYWORDS.some(k => hay.includes(k))) return { unlimited: true, motivo: 'Acesso ilimitado (tenant/user especial)' };
@@ -96,15 +97,16 @@ async function fetchTenantNome(sistemaSlug, tenantId) {
   return '';
 }
 
-async function getOrCreateLicenca({ sistemaSlug, tenantId, tenantNome, userNome }) {
+async function getOrCreateLicenca({ sistemaSlug, tenantId, tenantNome, userNome, isSuperAdmin }) {
   await init();
+  if (isSuperAdmin) return { unlimited: true, motivo: 'Superadmin — acesso ilimitado', plano: 'pro', trial: false };
   // tenta obter nome existente se não fornecido
   if (!tenantNome) {
     const r = await sql(`SELECT tenant_nome FROM tecno_licencas WHERE sistema_slug=$1 AND tenant_id=$2`, [sistemaSlug, tenantId]);
     if (r[0]?.tenant_nome) tenantNome = r[0].tenant_nome;
   }
   if (!tenantNome) tenantNome = await fetchTenantNome(sistemaSlug, tenantId);
-  const unlimited = isUnlimited({ sistemaSlug, tenantNome, userNome });
+  const unlimited = isUnlimited({ sistemaSlug, tenantNome, userNome, isSuperAdmin });
   if (unlimited.unlimited) {
     return { unlimited: true, motivo: unlimited.motivo, plano: 'pro', trial: false };
   }
@@ -138,8 +140,11 @@ async function getOrCreateLicenca({ sistemaSlug, tenantId, tenantNome, userNome 
   return { unlimited: false, trial: false, plano: lic.plano, lic };
 }
 
-async function verificarAcesso({ sistemaSlug, tenantId, tenantNome, userNome }) {
-  const info = await getOrCreateLicenca({ sistemaSlug, tenantId, tenantNome, userNome });
+async function verificarAcesso({ sistemaSlug, tenantId, tenantNome, userNome, isSuperAdmin }) {
+  const info = await getOrCreateLicenca({ sistemaSlug, tenantId, tenantNome, userNome, isSuperAdmin });
+  if (info.lic && info.lic.status === 'blocked') {
+    return { permitido: false, motivo: 'Licença bloqueada. Contacte o administrador.', ...info };
+  }
   if (info.unlimited) return { permitido: true, ...info };
   const plano = PLANOS[info.plano] || PLANOS.basico;
   const lic = info.lic;
@@ -159,4 +164,47 @@ async function registrarDownload({ sistemaSlug, tenantId }) {
   await sql(`UPDATE tecno_licencas SET downloads_usados = downloads_usados + 1, updated_at=now() WHERE sistema_slug=$1 AND tenant_id=$2 AND mes_ref=$3`, [sistemaSlug, tenantId, mes]);
 }
 
-export { PLANOS, isUnlimited, getOrCreateLicenca, verificarAcesso, registrarUsoPrompt, registrarDownload, init };
+async function listarLicencas() {
+  await init();
+  return sql(`SELECT * FROM tecno_licencas ORDER BY updated_at DESC LIMIT 500`);
+}
+async function atualizarLicenca({ sistemaSlug, tenantId, plano, status, trialFim }) {
+  await init();
+  const sets = []; const vals = []; let i = 1;
+  if (plano) { sets.push(`plano = $${i++}`); vals.push(plano); }
+  if (status) { sets.push(`status = $${i++}`); vals.push(status); }
+  if (trialFim) { sets.push(`trial_fim = $${i++}`); vals.push(new Date(trialFim)); }
+  if (!sets.length) throw new Error('Nada para atualizar');
+  sets.push(`updated_at = now()`);
+  vals.push(sistemaSlug, tenantId);
+  const q = `UPDATE tecno_licencas SET ${sets.join(', ')} WHERE sistema_slug = $${i++} AND tenant_id = $${i++} RETURNING *`;
+  // vals already has plano/status/trialFim, need to add slug/tenantId at end
+  // recompute correctly
+  const vals2 = []; let j = 1; const sets2 = [];
+  if (plano) { sets2.push(`plano = $${j++}`); vals2.push(plano); }
+  if (status) { sets2.push(`status = $${j++}`); vals2.push(status); }
+  if (trialFim) { sets2.push(`trial_fim = $${j++}`); vals2.push(new Date(trialFim)); }
+  sets2.push(`updated_at = now()`);
+  vals2.push(sistemaSlug, tenantId);
+  const q2 = `UPDATE tecno_licencas SET ${sets2.join(', ')} WHERE sistema_slug = $${j++} AND tenant_id = $${j++} RETURNING *`;
+  const r = await sql(q2, vals2);
+  if (!r[0]) throw new Error('Licença não encontrada');
+  return r[0];
+}
+async function renovarLicenca({ sistemaSlug, tenantId, dias = 10 }) {
+  await init();
+  const r = await sql(`SELECT * FROM tecno_licencas WHERE sistema_slug=$1 AND tenant_id=$2`, [sistemaSlug, tenantId]);
+  if (!r[0]) throw new Error('Licença não encontrada');
+  const novoFim = new Date(Date.now() + dias*24*60*60*1000);
+  const upd = await sql(`UPDATE tecno_licencas SET trial_fim=$1, status='trial', updated_at=now() WHERE sistema_slug=$2 AND tenant_id=$3 RETURNING *`, [novoFim, sistemaSlug, tenantId]);
+  return upd[0];
+}
+async function bloquearLicenca({ sistemaSlug, tenantId, bloquear = true }) {
+  await init();
+  const status = bloquear ? 'blocked' : 'active';
+  const r = await sql(`UPDATE tecno_licencas SET status=$1, updated_at=now() WHERE sistema_slug=$2 AND tenant_id=$3 RETURNING *`, [status, sistemaSlug, tenantId]);
+  if (!r[0]) throw new Error('Licença não encontrada');
+  return r[0];
+}
+
+export { PLANOS, isUnlimited, getOrCreateLicenca, verificarAcesso, registrarUsoPrompt, registrarDownload, listarLicencas, atualizarLicenca, renovarLicenca, bloquearLicenca, init };

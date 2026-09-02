@@ -23,7 +23,7 @@ router.post('/login', async (req, res) => {
 // Middleware: token válido + salão
 function exigirAutenticacao(req, res, next) {
   const ctx = contextoDoPedido(req);
-  if (!ctx || !ctx.farmaciaId) {
+  if (!ctx || (!ctx.farmaciaId && !ctx.isSuperAdmin)) {
     return res.status(401).json({ error: 'Não autenticado ou sem salão autorizado. Faça login.' });
   }
   req.ctx = ctx;
