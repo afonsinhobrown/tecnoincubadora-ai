@@ -88,6 +88,14 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
           properties: { id: { type: 'INTEGER', description: 'ID do produto' } },
           required: ['id']
         });
+      } else if (nome === 'acessos') {
+        add(nome, desc, {
+          type: 'OBJECT',
+          properties: {
+            periodo: { type: 'STRING', enum: ['total', 'hoje', 'semana', 'mes', '30d'],
+              description: 'Período. "total" = tudo. Use período apenas se o utilizador o pedir explicitamente.' }
+          }
+        });
       } else if (nome === 'fazer_venda') {
         add(nome, desc, {
           type: 'OBJECT',

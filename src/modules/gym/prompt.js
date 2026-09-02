@@ -34,6 +34,7 @@ export const PROMPT_GYM = {
     ranking_clientes: 'ranking de clientes por valor de faturas',
     caixa: 'sessões de caixa (abertas e fechadas) e saldos',
     faturacao_mes: 'faturação agregada por mês',
+    acessos: 'clientes que acederam no período (via presenças)',
     detalhe_produto: 'ficha de um produto com preço e estoque'
   },
 
@@ -108,6 +109,14 @@ export const PROMPT_GYM = {
       titulo: '📅 Faturação por mês',
       frases: ['faturação por mês', 'faturação mensal', 'vendas por mês', 'faturação dos últimos meses'],
       palavras: ['por mês', 'por mes', 'mensal', 'faturação por mês', 'faturação mensal']
+    },
+    {
+      id: 'acessos',
+      ferramenta: 'acessos',
+      titulo: '👟 Acessos no período',
+      frases: ['clientes que acederam', 'quem acedeu o ginásio', 'acessos deste mês', 'entradas no ginásio', 'quem entrou'],
+      palavras: ['acederam', 'acedeu', 'acesso', 'acessos', 'entraram', 'entrou', 'presenças', 'presenca'],
+      parametros: { periodo: 'auto' }
     }
   ],
 

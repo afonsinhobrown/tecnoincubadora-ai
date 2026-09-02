@@ -15,6 +15,18 @@ function gymDe(params) {
   return params.gymId;
 }
 
+function janelaTempo(periodo) {
+  const agora = new Date();
+  const inicio = new Date(agora);
+  switch (periodo) {
+    case 'hoje': inicio.setHours(0, 0, 0, 0); break;
+    case 'semana': inicio.setDate(inicio.getDate() - 7); break;
+    case 'mes': inicio.setDate(1); inicio.setHours(0, 0, 0, 0); break;
+    default: inicio.setDate(inicio.getDate() - 30);
+  }
+  return inicio;
+}
+
 async function resumoVendas(periodo, gymId) {
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
@@ -206,19 +218,41 @@ async function faturacaoMes(gymId) {
   `, [gymId]);
 }
 
+async function acessos(periodo, gymId) {
+  const inicio = periodo === 'total' ? null : janelaTempo(periodo);
+  const inicioStr = inicio ? inicio.toISOString() : null;
+  const whereGym = `($1::text IS NULL OR gym_id::text = $1)`;
+  const whereData = `($2::text IS NULL OR timestamp >= $2::text)`;
+  const [totais] = await sql(`
+    SELECT count(distinct user_id)::int AS clientes
+    FROM attendance
+    WHERE ${whereGym} AND ${whereData}
+  `, [gymId, inicioStr]);
+  const lista = await sql(`
+    SELECT user_name AS nome, max(timestamp) AS ultimo_acesso, count(*)::int AS acessos
+    FROM attendance
+    WHERE ${whereGym} AND ${whereData}
+    GROUP BY user_id, user_name
+    ORDER BY ultimo_acesso DESC
+    LIMIT 100
+  `, [gymId, inicioStr]);
+  return { totais, lista };
+}
+
 export const FERRAMENTAS_GYM = {
-  buscar_produtos: (p = {}) => buscarProdutos(p.termos, gymDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', gymDe(p)),
-  top_produtos: (p = {}) => topProdutos(gymDe(p)),
-  estoque_baixo: (p = {}) => estoqueBaixo(gymDe(p)),
-  clientes: (p = {}) => resumoClientes(gymDe(p)),
-  detalhe_produto: (p = {}) => detalheProduto(p.id, gymDe(p)),
-  dentro: (p = {}) => quemDentro(gymDe(p)),
-  faturas: (p = {}) => faturas(gymDe(p)),
-  mensalidades: (p = {}) => mensalidades(gymDe(p)),
-  ranking_clientes: (p = {}) => rankingClientes(gymDe(p)),
-  caixa: (p = {}) => caixa(gymDe(p)),
-  faturacao_mes: (p = {}) => faturacaoMes(gymDe(p))
+  buscar_produtos: (p = {}) => buscarProdutos(p.termos, p.isSuperAdmin ? null : gymDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', p.isSuperAdmin ? null : gymDe(p)),
+  top_produtos: (p = {}) => topProdutos(p.isSuperAdmin ? null : gymDe(p)),
+  estoque_baixo: (p = {}) => estoqueBaixo(p.isSuperAdmin ? null : gymDe(p)),
+  clientes: (p = {}) => resumoClientes(p.isSuperAdmin ? null : gymDe(p)),
+  detalhe_produto: (p = {}) => detalheProduto(p.id, p.isSuperAdmin ? null : gymDe(p)),
+  dentro: (p = {}) => quemDentro(p.isSuperAdmin ? null : gymDe(p)),
+  faturas: (p = {}) => faturas(p.isSuperAdmin ? null : gymDe(p)),
+  mensalidades: (p = {}) => mensalidades(p.isSuperAdmin ? null : gymDe(p)),
+  ranking_clientes: (p = {}) => rankingClientes(p.isSuperAdmin ? null : gymDe(p)),
+  caixa: (p = {}) => caixa(p.isSuperAdmin ? null : gymDe(p)),
+  faturacao_mes: (p = {}) => faturacaoMes(p.isSuperAdmin ? null : gymDe(p)),
+  acessos: (p = {}) => acessos(p.periodo ?? 'mes', p.isSuperAdmin ? null : gymDe(p))
 };
 
 export async function executarFerramentaGym(nome, params = {}) {
