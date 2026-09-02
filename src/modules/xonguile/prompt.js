@@ -32,6 +32,7 @@ export const PROMPT_XONGUILE = {
     agenda: 'agendamentos por estado (marcado, em serviço, concluído)',
     servicos: 'lista de serviços e preços',
     profissionais: 'profissionais do salão e a sua produção',
+    relatorio_insight: 'relatório próprio da ferramenta: serviços mais vendidos, faturação por mês, totais de clientes',
     detalhe_produto: 'ficha de um produto com preço e estoque'
   },
 
@@ -85,6 +86,13 @@ export const PROMPT_XONGUILE = {
       titulo: '🧑‍🎨 Profissionais',
       frases: ['quantos profissionais', 'profissionais do salão', 'lista de profissionais'],
       palavras: ['profissionais', 'profissional', 'funcionários', 'funcionarios']
+    },
+    {
+      id: 'relatorio_insight',
+      ferramenta: 'relatorio_insight',
+      titulo: '📈 Relatório do salão',
+      frases: ['relatório do salão', 'serviços mais vendidos', 'faturação por mês', 'visão geral do salão', 'resumo geral'],
+      palavras: ['relatório do salão', 'relatorio do salao', 'visão geral', 'visao geral', 'resumo geral', 'serviços mais vendidos']
     }
   ],
 

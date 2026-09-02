@@ -196,8 +196,27 @@ export const FERRAMENTAS_XONGUILE = {
   detalhe_produto: (p = {}) => detalheProduto(p.id, salaoDe(p)),
   agenda: (p = {}) => agenda(salaoDe(p), p.consulta),
   servicos: (p = {}) => servicos(salaoDe(p)),
-  profissionais: (p = {}) => profissionais(salaoDe(p))
+  profissionais: (p = {}) => profissionais(salaoDe(p)),
+  relatorio_insight: (p = {}) => relatorioInsight(salaoDe(p))
 };
+
+// Relatório próprio da ferramenta: serviços mais vendidos + faturação por profissional
+async function relatorioInsight(salonId) {
+  const [totais] = await sql(`
+    SELECT count(*)::int AS clientes FROM "Clients" WHERE "SalonId"=$1`, [salonId]);
+  const topServicos = await sql(`
+    SELECT it.name AS servico, it.type AS tipo,
+           sum(it.quantity)::int AS unidades, sum(it.total)::numeric(12,2) AS receita
+    FROM "InvoiceItems" it JOIN "Invoices" inv ON inv.id=it."InvoiceId"
+    WHERE it."SalonId"=$1 AND inv.status<>'voided'
+    GROUP BY it.name, it.type ORDER BY receita DESC LIMIT 15`, [salonId]);
+  const faturacaoMes = await sql(`
+    SELECT to_char(date_trunc('month',"createdAt"),'YYYY-MM') AS mes,
+           count(*)::int AS faturas, coalesce(sum(total),0)::numeric(12,2) AS total
+    FROM "Invoices" WHERE "SalonId"=$1 AND status<>'voided' AND "paymentStatus"='paid'
+    GROUP BY mes ORDER BY mes DESC LIMIT 12`, [salonId]);
+  return { fonte: 'relatorio_criado_pela_ferramenta', totais, top_servicos: topServicos, faturacao_por_mes: faturacaoMes };
+}
 
 export async function executarFerramentaXonguile(nome, params = {}) {
   const ferramenta = FERRAMENTAS_XONGUILE[nome];
