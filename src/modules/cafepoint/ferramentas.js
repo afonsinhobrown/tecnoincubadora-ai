@@ -165,8 +165,35 @@ export const FERRAMENTAS_CAFEPOINT = {
   pedidos_estado: (p = {}) => pedidosEstado(restDe(p)),
   mesas: (p = {}) => mesas(restDe(p)),
   reservas: (p = {}) => reservas(restDe(p)),
-  despesas: (p = {}) => despesas(restDe(p))
+  despesas: (p = {}) => despesas(restDe(p)),
+  relatorio_insight: (p = {}) => relatorioInsight(restDe(p))
 };
+
+// Relatório próprio da ferramenta: receita por categoria + vendas/mês + despesas/mês
+async function relatorioInsight(restaurantId) {
+  const receitaPorCategoria = await sql(`
+    SELECT mi.category AS categoria,
+           count(*)::int AS vendas,
+           coalesce(sum(oi.quantity * oi.price),0)::numeric(12,2) AS receita
+    FROM "OrderItem" oi JOIN "Order" o ON o.id=oi."orderId"
+    JOIN "MenuItem" mi ON mi.id=oi."menuItemId"
+    WHERE o."restaurantId"=$1 AND o.status IN ('PAID','COMPLETED')
+    GROUP BY mi.category ORDER BY receita DESC`, [restaurantId]);
+  const faturacaoMes = await sql(`
+    SELECT to_char(date_trunc('month',o."createdAt"),'YYYY-MM') AS mes,
+           count(*)::int AS pedidos, coalesce(sum(o."totalAmount"),0)::numeric(12,2) AS total
+    FROM "Order" o WHERE o."restaurantId"=$1 AND o.status IN ('PAID','COMPLETED')
+    GROUP BY mes ORDER BY mes DESC LIMIT 12`, [restaurantId]);
+  const despesasMes = await sql(`
+    SELECT to_char(date_trunc('month',e.date),'YYYY-MM') AS mes,
+           count(*)::int AS despesas, coalesce(sum(e.amount),0)::numeric(12,2) AS total
+    FROM "Expense" e WHERE e."restaurantId"=$1 GROUP BY mes ORDER BY mes DESC LIMIT 12`, [restaurantId]);
+  const [totais] = await sql(`
+    SELECT (SELECT count(*)::int FROM "Customer" WHERE "restaurantId"=$1) AS clientes,
+           (SELECT coalesce(sum("totalAmount"),0)::numeric(12,2) FROM "Order" WHERE "restaurantId"=$1 AND status IN ('PAID','COMPLETED')) AS faturado
+  `, [restaurantId]);
+  return { fonte: 'relatorio_criado_pela_ferramenta', totais, receita_por_categoria: receitaPorCategoria, faturacao_por_mes: faturacaoMes, despesas_por_mes: despesasMes };
+}
 
 export async function executarFerramentaCafepoint(nome, params = {}) {
   const ferramenta = FERRAMENTAS_CAFEPOINT[nome];

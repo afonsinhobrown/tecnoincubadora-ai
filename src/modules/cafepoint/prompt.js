@@ -32,6 +32,7 @@ export const PROMPT_CAFEPOINT = {
     mesas: 'mesas do restaurante e o seu estado',
     reservas: 'reservas de mesas',
     despesas: 'despesas do restaurante',
+    relatorio_insight: 'relatório próprio da ferramenta: receita por categoria, vendas e despesas por mês',
     detalhe_produto: 'ficha de um item do menu com preço e estoque'
   },
 
@@ -92,6 +93,13 @@ export const PROMPT_CAFEPOINT = {
       titulo: '💸 Despesas',
       frases: ['despesas do mês', 'despesas do restaurante', 'quanto gastei', 'despesas por categoria'],
       palavras: ['despesas', 'despesa', 'gastei', 'gasto', 'despesa do mês']
+    },
+    {
+      id: 'relatorio_insight',
+      ferramenta: 'relatorio_insight',
+      titulo: '📈 Relatório do restaurante',
+      frases: ['relatório do restaurante', 'receita por categoria', 'vendas por mês', 'visão geral do restaurante', 'resumo geral'],
+      palavras: ['relatório do restaurante', 'relatorio do restaurante', 'visão geral', 'visao geral', 'resumo geral', 'receita por categoria']
     }
   ],
 
