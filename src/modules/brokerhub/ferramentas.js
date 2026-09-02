@@ -5,6 +5,7 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 import { neon } from '@neondatabase/serverless';
+import { extrairCriterio } from '../../criterios/index.js';
 
 const sql = neon(process.env.BROKERHUB_DATABASE_URL);
 
@@ -133,8 +134,27 @@ export const FERRAMENTAS_BROKERHUB = {
   apolices: (p = {}) => apolices(tenantDe(p)),
   sinistros: (p = {}) => sinistros(tenantDe(p)),
   comissoes: (p = {}) => comissoes(tenantDe(p)),
-  pipeline: (p = {}) => pipeline(tenantDe(p))
+  pipeline: (p = {}) => pipeline(tenantDe(p)),
+  relatorio_insight: (p = {}) => relatorioInsight(tenantDe(p))
 };
+
+// Relatório próprio (via BD): resumo da carteira + comissões + top corretores
+async function relatorioInsight(tenantId) {
+  const dealsPorEstado = await sql(`
+    SELECT coalesce(estado,'—') AS estado, count(*)::int AS deals,
+           coalesce(sum(valor_estimado),0)::numeric(12,2) AS valor
+    FROM deals WHERE tenant_id=$1 AND deleted=false GROUP BY estado ORDER BY deals DESC`, [tenantId]);
+  const topCorretores = await sql(`
+    SELECT c.nome AS cliente, count(d.id)::int AS deals,
+           coalesce(sum(d.valor_estimado),0)::numeric(12,2) AS valor
+    FROM deals d LEFT JOIN clientes c ON c.id=d.cliente_id
+    WHERE d.tenant_id=$1 AND d.deleted=false GROUP BY c.nome ORDER BY valor DESC LIMIT 10`, [tenantId]);
+  const [totais] = await sql(`
+    SELECT count(*)::int AS deals,
+           coalesce(sum(valor_estimado),0)::numeric(12,2) AS carteira_total
+    FROM deals WHERE tenant_id=$1 AND deleted=false`, [tenantId]);
+  return { fonte: 'relatorio_criado_pela_ferramenta', totais, deals_por_estado: dealsPorEstado, top_clientes: topCorretores };
+}
 
 export async function executarFerramentaBrokerhub(nome, params = {}) {
   const ferramenta = FERRAMENTAS_BROKERHUB[nome];

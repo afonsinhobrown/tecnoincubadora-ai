@@ -31,7 +31,8 @@ export const PROMPT_BROKERHUB = {
     apolices: 'apólices ativas e por seguradora',
     sinistros: 'sinistros por estado',
     comissoes: 'comissões por corretor e estado',
-    pipeline: 'funil de vendas por etapa'
+    pipeline: 'funil de vendas por etapa',
+    relatorio_insight: 'relatório próprio da ferramenta: resumo da carteira, deals por estado e top corretores'
   },
 
   intencoes: [
@@ -91,6 +92,13 @@ export const PROMPT_BROKERHUB = {
       titulo: '🔄 Funil de vendas',
       frases: ['funil de vendas', 'deals por etapa', 'pipeline'],
       palavras: ['funil', 'pipeline', 'etapa']
+    },
+    {
+      id: 'relatorio_insight',
+      ferramenta: 'relatorio_insight',
+      titulo: '📈 Relatório da corretora',
+      frases: ['resumo da corretora', 'carteira por estado', 'top corretores', 'relatório geral', 'situação dos negócios'],
+      palavras: ['relatório geral', 'relatorio geral', 'situação dos negócios', 'resumo da corretora', 'visão geral']
     }
   ],
 
