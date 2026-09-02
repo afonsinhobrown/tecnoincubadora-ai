@@ -6,6 +6,9 @@ import farmaciaRouter from './modules/farmacia/routes.js';
 const app = express();
 app.use(express.json());
 
+// Interface de teste pública
+app.use(express.static('public'));
+
 // Módulo GestorFarma
 app.use('/api/farmacia', farmaciaRouter);
 
