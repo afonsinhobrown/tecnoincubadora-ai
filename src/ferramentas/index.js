@@ -13,7 +13,8 @@ import {
   topProdutos,
   estoqueBaixo,
   resumoClientes,
-  pedidosPorEstado
+  pedidosPorEstado,
+  relatorioInsight
 } from '../modules/farmacia/reporting.js';
 import {
   buscarProdutos,
@@ -34,6 +35,7 @@ export const FERRAMENTAS = {
   pedidos_estado: (p = {}) => pedidosPorEstado(farmaciaDe(p)),
   clientes: (p = {}) => resumoClientes(farmaciaDe(p)),
   detalhe_produto: (p = {}) => obterProdutoExato(p.id),
+  relatorio_insight: (p = {}) => relatorioInsight(farmaciaDe(p)),
   // ESCRITA — apenas com utilizador autorizado na farmácia
   fazer_venda: (p = {}) => fazerVenda(p, { farmaciaId: p.farmaciaId, vendedorId: p.vendedorId })
 };

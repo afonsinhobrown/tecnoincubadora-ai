@@ -42,6 +42,7 @@ export const PROMPT_SISTEMA = {
     pedidos_estado: 'pedidos agrupados por estado',
     clientes: 'contagem de clientes registados',
     detalhe_produto: 'ficha completa de um produto com preço e estoque',
+    relatorio_insight: 'relatório próprio da ferramenta: vendas por produto, faturação por mês e por forma de pagamento',
     fazer_venda: 'REGISTA uma venda de balcão (pedido + itens + baixa de estoque). Parâmetros: itens[{produto, quantidade}], forma_pagamento'
   },
 
@@ -103,6 +104,13 @@ export const PROMPT_SISTEMA = {
       titulo: '👥 Clientes',
       frases: ['quantos clientes tenho', 'clientes novos', 'clientes registados'],
       palavras: ['clientes', 'cliente', 'consumidores']
+    },
+    {
+      id: 'relatorio_insight',
+      ferramenta: 'relatorio_insight',
+      titulo: '📈 Relatório da farmácia',
+      frases: ['relatório da farmácia', 'resumo de vendas por produto', 'faturação por mês', 'visão geral das vendas', 'relatório geral'],
+      palavras: ['relatório da farmácia', 'relatorio da farmacia', 'visão geral', 'visao geral', 'resumo geral']
     }
     // Busca de produtos não precisa de intenção: é o comportamento
     // padrão quando nenhum outro é detetado e há termos de produto.

@@ -106,3 +106,29 @@ export async function pedidosPorEstado(farmaciaId) {
     GROUP BY status ORDER BY pedidos DESC
   `, [farmaciaId]);
 }
+
+// Relatório próprio da ferramenta (via BD): vendas por produto + faturação por mês + forma
+export async function relatorioInsight(farmaciaId) {
+  const [totais] = await sql(`
+    SELECT count(*)::int AS pedidos,
+           coalesce(sum(total),0)::numeric(12,2) AS faturado
+    FROM pedidos_pedido WHERE farmacia_id=$1 AND status NOT IN ('CANCELADO','cancelado')`, [farmaciaId]);
+  const vendasPorProduto = await sql(`
+    SELECT p.nome AS produto, sum(i.quantidade)::int AS unidades,
+           sum(i.subtotal)::numeric(12,2) AS receita
+    FROM pedidos_itempedido i JOIN produtos_produto p ON p.id=i.produto_id
+    JOIN pedidos_pedido ped ON ped.id=i.pedido_id
+    WHERE ped.farmacia_id=$1 AND ped.status NOT IN ('CANCELADO','cancelado')
+    GROUP BY p.nome ORDER BY receita DESC LIMIT 15`, [farmaciaId]);
+  const faturacaoPorMes = await sql(`
+    SELECT to_char(date_trunc('month', data_criacao),'YYYY-MM') AS mes,
+           count(*)::int AS pedidos, coalesce(sum(total),0)::numeric(12,2) AS total
+    FROM pedidos_pedido WHERE farmacia_id=$1 AND status NOT IN ('CANCELADO','cancelado')
+    GROUP BY mes ORDER BY mes DESC LIMIT 12`, [farmaciaId]);
+  const porForma = await sql(`
+    SELECT forma_pagamento, count(*)::int AS pedidos,
+           coalesce(sum(total),0)::numeric(12,2) AS total
+    FROM pedidos_pedido WHERE farmacia_id=$1 AND status NOT IN ('CANCELADO','cancelado')
+    GROUP BY forma_pagamento ORDER BY total DESC`, [farmaciaId]);
+  return { fonte: 'relatorio_criado_pela_ferramenta', totais, vendas_por_produto: vendasPorProduto, faturacao_por_mes: faturacaoPorMes, por_forma_pagamento: porForma };
+}
