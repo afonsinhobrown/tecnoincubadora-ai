@@ -5,6 +5,7 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 import { neon } from '@neondatabase/serverless';
+import { extrairCriterio } from '../../criterios/index.js';
 
 const sql = neon(process.env.CAFEPOINT_DATABASE_URL);
 
