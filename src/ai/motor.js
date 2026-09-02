@@ -17,8 +17,13 @@
 import { PROMPT_SISTEMA as PROMPT_FARMACIA } from './promptSistema.js';
 import { executarFerramenta as ferramentasFarmacia } from '../ferramentas/index.js';
 
-const API_KEY = process.env.GEMINI_API_KEY;
-const MODELO = process.env.GEMINI_MODELO || 'gemini-1.5-flash';
+// ── Configuração do LLM (fornecedor configurável) ────────────────────
+// Prioridade: LLM_PROVIDER explícito. Se "openrouter", usa a API
+// OpenAI-compatível; se "gemini" (padrão), usa a Generative Language API.
+const PROVIDER = (process.env.LLM_PROVIDER || (process.env.LLM_API_KEY ? 'openrouter' : 'gemini')).toLowerCase();
+const API_KEY = process.env.LLM_API_KEY || process.env.GEMINI_API_KEY;
+const MODELO = process.env.LLM_MODEL || process.env.GEMINI_MODELO || 'gemini-3.6-flash';
+const OPENROUTER_URL = process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions';
 const URL_GEMINI = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${API_KEY}`;
 
 const GATILHOS_RECUSA_PADRAO = [
@@ -113,7 +118,13 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
     return lista;
   }
 
-  // ── Chama a API Gemini ───────────────────────────────────────────
+  // ── Chamada ao LLM (fornecedor configurável) ─────────────────────
+  // Normaliza a resposta em { functionCall?: {name,args}, text }.
+  async function chamarLLM(frase) {
+    if (PROVIDER === 'openrouter') return chamarOpenRouter(frase);
+    return chamarGemini(frase);
+  }
+
   async function chamarGemini(frase) {
     const body = {
       systemInstruction: { parts: [{ text: construirPromptSistema() }] },
@@ -121,30 +132,90 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
       tools: [{ functionDeclarations: declararFerramentas() }],
       generationConfig: { temperature: 0.2 }
     };
+    const res = await fetchComRetry(URL_GEMINI, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`LLM Gemini ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    const part = data?.candidates?.[0]?.content?.parts
+      ?.find(p => p.functionCall || p.text);
+    if (!part) return null;
+    return part.functionCall
+      ? { functionCall: { name: part.functionCall.name, args: part.functionCall.args || {} } }
+      : { text: part.text || '' };
+  }
+
+  // OpenAI-compatível (OpenRouter, OpenAI, DeepSeek, etc.) com function calling
+  // Normaliza os tipos do schema (Gemini usa STRING/OBJECT; OpenAI exige minúsculas).
+  function normalizarSchema(s) {
+    if (!s || typeof s !== 'object') return s;
+    const out = Array.isArray(s) ? [] : {};
+    for (const [k, v] of Object.entries(s)) {
+      if (k === 'type' && typeof v === 'string') out[k] = v.toLowerCase();
+      else out[k] = (v && typeof v === 'object') ? normalizarSchema(v) : v;
+    }
+    return out;
+  }
+
+  async function chamarOpenRouter(frase) {
+    const tools = declararFerramentas().map(fn => ({
+      type: 'function',
+      function: {
+        name: fn.name,
+        description: fn.description,
+        parameters: normalizarSchema(fn.parameters || { type: 'OBJECT', properties: {} })
+      }
+    }));
+    const body = {
+      model: MODELO,
+      messages: [
+        { role: 'system', content: construirPromptSistema() },
+        { role: 'user', content: frase }
+      ],
+      tools,
+      tool_choice: 'auto',
+      temperature: 0.2
+    };
+    const res = await fetchComRetry(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + API_KEY
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`LLM ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    const msg = data?.choices?.[0]?.message;
+    if (!msg) return null;
+    const toolCall = msg.tool_calls?.[0];
+    if (toolCall?.function) {
+      let args = {};
+      try { args = JSON.parse(toolCall.function.arguments || '{}'); } catch {}
+      return { functionCall: { name: toolCall.function.name, args } };
+    }
+    return { text: msg.content || '' };
+  }
+
+  async function fetchComRetry(url, init) {
     const MAX_TENTATIVAS = 3;
     let res;
     for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
-      res = await fetch(URL_GEMINI, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
+      res = await fetch(url, init);
       if (res.status === 503 || res.status === 429) {
         await new Promise(r => setTimeout(r, tentativa * 1500));
         continue;
       }
       break;
     }
-    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-    const data = await res.json();
-    const part = data?.candidates?.[0]?.content?.parts
-      ?.find(p => p.functionCall || p.text);
-    return part || null;
+    return res;
   }
 
   // ── Modo LLM ─────────────────────────────────────────────────────
   async function processarLLM(frase, ctx) {
-    const part = await chamarGemini(frase);
+    const part = await chamarLLM(frase);
     if (!part) return { blocos: [], produtos: [] };
 
     if (part.functionCall) {
