@@ -169,6 +169,7 @@ export const LANDING_HTML = `<!DOCTYPE html>
       <button id="btn-wa" onclick="partilharWhatsapp()" title="Partilhar por WhatsApp">WhatsApp</button>
       <button id="btn-insights" onclick="mostrarInsights()" title="Resumo e indicadores de negócio">📊 Insights</button>
     </div>
+    <div id="licenca-info" style="display:none; margin-bottom:10px; padding:8px 12px; border-radius:8px; font-size:.8rem; background:#fff; border:1px solid var(--borda);"></div>
     <div class="busca-box">
       <label for="q">Pergunta em linguagem normal</label>
       <div class="linha">
@@ -209,6 +210,7 @@ const elBtn = document.getElementById('btn');
 const elEstado = document.getElementById('estado');
 const elResp = document.getElementById('resposta');
 const elModo = document.getElementById('modo-info');
+const elLicenca = document.getElementById('licenca-info');
 const elProgresso = document.getElementById('progresso');
 const MZN = v => Number(v).toLocaleString('pt-MZ', { minimumFractionDigits: 2 }) + ' MZN';
 
@@ -284,8 +286,34 @@ function sair() {
   localStorage.removeItem('gf_sistema');
   elEmail.value = ''; elPass.value = '';
   elEstado.className = ''; elEstado.textContent = '';
+  elLicenca.style.display = 'none';
   elResp.innerHTML = '';
   mostrarVista('landing');
+}
+
+function atualizarLicencaDisplay(lic) {
+  if (!lic) { elLicenca.style.display = 'none'; return; }
+  if (lic.unlimited) {
+    elLicenca.style.display = 'block';
+    elLicenca.style.background = '#dcfce7'; elLicenca.style.color = '#166534'; elLicenca.style.borderColor = '#bbf7d0';
+    elLicenca.textContent = '✓ ' + (lic.motivo || 'Acesso ilimitado');
+    return;
+  }
+  let texto = '';
+  if (lic.trial && lic.trialFim) {
+    const dias = Math.max(0, Math.ceil((new Date(lic.trialFim) - new Date()) / 86400000));
+    texto = 'Trial: ' + dias + ' dias restantes (até ' + new Date(lic.trialFim).toLocaleDateString('pt-PT') + ') | Plano: ' + (lic.plano || 'basico');
+    elLicenca.style.background = '#fef3c7'; elLicenca.style.color = '#92400e';
+  } else {
+    const plano = lic.plano || 'basico';
+    const usados = lic.lic?.prompts_usados ?? 0;
+    const limites = { basico: 50, standard: 80, pro: Infinity };
+    const limite = limites[plano] ?? 50;
+    texto = 'Plano ' + plano + ' | Prompts: ' + usados + '/' + (limite === Infinity ? '∞' : limite) + ' este mês';
+    elLicenca.style.background = '#fff'; elLicenca.style.color = 'var(--cinza)';
+  }
+  elLicenca.style.display = 'block';
+  elLicenca.textContent = texto;
 }
 
 // Exporta a resposta atual como PDF (usa o diálogo de impressão do navegador)
@@ -435,7 +463,9 @@ async function perguntar() {
     });
     const d = await r.json();
     if (r.status === 401) { sair(); throw new Error('Sessão expirada. Inicie sessão de novo.'); }
+    if (r.status === 402) { atualizarLicencaDisplay(d.licenca); throw new Error(d.error || 'Limite atingido'); }
     if (!r.ok) throw new Error(d.error || 'Erro');
+    if (d.licenca) atualizarLicencaDisplay(d.licenca);
     ULTIMA_RESPOSTA = { blocos: d.blocos, produtos: d.produtos, sistema: getSistema(), query };
     const temRel = d.blocos.length > 0, temProd = d.total_produtos > 0;
     elModo.className = '';
@@ -448,9 +478,15 @@ async function perguntar() {
     d.blocos.forEach(renderBloco);
     if (temProd) renderProdutos(d.produtos, temRel);
     if (!temRel && !temProd) elResp.innerHTML = '<div class="vazio">🙈 Experimenta: “vendas de hoje”, “estoque baixo”, “paracetamol”…</div>';
+    if (d.licenca) atualizarLicencaDisplay(d.licenca);
   } catch (err) {
     elEstado.className = 'erro';
     elEstado.textContent = 'Erro: ' + err.message;
+    if (err.message.includes('402') || err.message.includes('Limite')) {
+      elLicenca.style.display = 'block';
+      elLicenca.style.background = '#fee2e2'; elLicenca.style.color = '#991b1b';
+      elLicenca.textContent = '⚠️ ' + err.message;
+    }
   } finally { elBtn.disabled = false; elProgresso.style.display = 'none'; }
 }
 

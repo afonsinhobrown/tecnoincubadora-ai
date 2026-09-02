@@ -1,6 +1,7 @@
 import express from 'express';
 import { neon } from '@neondatabase/serverless';
 import { contextoDoPedido } from '../../auth/index.js';
+import { verificarAcesso, registrarUsoPrompt } from '../../licencas/index.js';
 import { criarMotor } from '../../ai/motor.js';
 import { PROMPT_ENTREGAS } from './prompt.js';
 import { executarFerramentaEntregas } from './ferramentas.js';
@@ -31,6 +32,8 @@ router.use(exigirAutenticacao);
 router.post('/pergunta', async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ error: 'query é obrigatório' });
+  const _lic = await verificarAcesso({ sistemaSlug: 'entregasmoz', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
+  if (!_lic.permitido) return res.status(402).json({ error: _lic.motivo, licenca: _lic, plano: _lic.plano });
 
   try {
     // resolve contexto do utilizador a partir do uid do token
@@ -43,7 +46,8 @@ router.post('/pergunta', async (req, res) => {
     }
     const tenant = { userId: req.ctx.usuarioId, userType: u?.userType || 'ADMIN', providerId };
     const { blocos, produtos, modo } = await motor.processar(query, { tenant });
-    res.json({ blocos, produtos, total_produtos: produtos.length, modo });
+    await registrarUsoPrompt({ sistemaSlug: 'entregasmoz', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
+    res.json({ blocos, produtos, total_produtos: produtos.length, modo, licenca: _lic });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

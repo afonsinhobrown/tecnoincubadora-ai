@@ -2,6 +2,7 @@ import express from 'express';
 import { buscarProdutos, obterProdutoExato } from './search.js';
 import { processar } from '../../ai/motor.js';
 import { login, contextoDoPedido } from '../../auth/index.js';
+import { verificarAcesso, registrarUsoPrompt } from '../../licencas/index.js';
 // Módulo: TECNOINCUBADORA AI — Farmácia (GestorFarma)
 // Router montado em /modules/farmacia pelo servidor central (src/server.js)
 // Todo o acesso à IA exige credencial; as operações são limitadas à farmácia
@@ -39,6 +40,8 @@ router.use(exigirAutenticacao);
 router.post('/pergunta', async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ error: 'query é obrigatório' });
+  const _lic = await verificarAcesso({ sistemaSlug: 'gestorfarma', tenantId: String(req.ctx.farmaciaId) });
+  if (!_lic.permitido) return res.status(402).json({ error: _lic.motivo, licenca: _lic, plano: _lic.plano });
 
   const { farmaciaId, vendedorId } = req.ctx;
   const ctx = {
@@ -48,7 +51,8 @@ router.post('/pergunta', async (req, res) => {
   };
   try {
     const { blocos, produtos, modo } = await processar(query, ctx);
-    res.json({ blocos, produtos: produtos.slice(0, 8), total_produtos: produtos.length, modo });
+    await registrarUsoPrompt({ sistemaSlug: 'gestorfarma', tenantId: String(req.ctx.farmaciaId) });
+    res.json({ blocos, produtos: produtos.slice(0, 8), total_produtos: produtos.length, modo, licenca: _lic });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

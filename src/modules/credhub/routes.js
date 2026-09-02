@@ -1,6 +1,7 @@
 import express from 'express';
 import { neon } from '@neondatabase/serverless';
 import { contextoDoPedido } from '../../auth/index.js';
+import { verificarAcesso, registrarUsoPrompt } from '../../licencas/index.js';
 import { criarMotor } from '../../ai/motor.js';
 import { PROMPT_CREDHUB } from './prompt.js';
 import { executarFerramentaCredhub } from './ferramentas.js';
@@ -31,6 +32,8 @@ router.use(exigirAutenticacao);
 router.post('/pergunta', async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ error: 'query é obrigatório' });
+  const _lic = await verificarAcesso({ sistemaSlug: 'credhub', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
+  if (!_lic.permitido) return res.status(402).json({ error: _lic.motivo, licenca: _lic, plano: _lic.plano });
 
   try {
     // resolve o schema do tenant a partir do id autenticado
@@ -38,7 +41,8 @@ router.post('/pergunta', async (req, res) => {
     const schema = t[0]?.schema_name;
     if (!schema) return res.status(403).json({ error: 'Tenant sem schema configurado.' });
     const { blocos, produtos, modo } = await motor.processar(query, { tenant: { schema } });
-    res.json({ blocos, produtos, total_produtos: produtos.length, modo });
+    await registrarUsoPrompt({ sistemaSlug: 'credhub', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
+    res.json({ blocos, produtos, total_produtos: produtos.length, modo, licenca: _lic });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
