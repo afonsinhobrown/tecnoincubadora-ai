@@ -1,6 +1,7 @@
 /**
  * Login do DDGEI. Password em dois formatos na BD:
  *  - pbkdf2 Werkzeug: `pbkdf2:sha256:600000$salt(b64)$hash(hex)`
+ *  - pbkdf2 Django: `pbkdf2_sha256$iterations$salt$hash(base64)`
  *  - MD5 hex (32 chars)
  */
 import { pbkdf2Sync, createHash } from 'node:crypto';
@@ -11,16 +12,31 @@ const sql = neon(process.env.DDGEI_DATABASE_URL);
 
 function verificarPw(password, armazenado) {
   if (!armazenado) return false;
-  if (String(armazenado).startsWith('pbkdf2:')) {
-    const partes = String(armazenado).split('$');
+  const hash = String(armazenado);
+
+  if (hash.startsWith('pbkdf2:')) {
+    const partes = hash.split('$');
     if (partes.length !== 3) return false;
-    const [, saltB64, hashHex] = partes;
+    const [algoritmo, saltB64, hashHex] = partes;
+    const [, digest, iteracoes] = algoritmo.split(':');
+    if (digest !== 'sha256' || !Number.isSafeInteger(Number(iteracoes))) return false;
     const salt = Buffer.from(saltB64, 'base64');
-    const derivado = pbkdf2Sync(password, salt, 600000, 32, 'sha256');
+    const derivado = pbkdf2Sync(password, salt, Number(iteracoes), 32, 'sha256');
     return derivado.toString('hex') === hashHex;
   }
+
+  if (hash.startsWith('pbkdf2_sha256$')) {
+    const partes = hash.split('$');
+    if (partes.length !== 4) return false;
+    const [, iteracoes, salt, hashB64] = partes;
+    const tamanhoHash = Buffer.from(hashB64, 'base64').length;
+    if (!Number.isSafeInteger(Number(iteracoes)) || !salt || !tamanhoHash) return false;
+    const derivado = pbkdf2Sync(password, salt, Number(iteracoes), tamanhoHash, 'sha256');
+    return derivado.toString('base64') === hashB64;
+  }
+
   // MD5 hex
-  return createHash('md5').update(String(password)).digest('hex') === armazenado;
+  return createHash('md5').update(String(password)).digest('hex') === hash;
 }
 
 export async function loginDdgei(username, password) {
