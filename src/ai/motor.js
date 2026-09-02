@@ -321,18 +321,18 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
         const r = await processarLLM(frase, ctx);
         // resposta com ferramenta executada (dados reais) -> usar
         const usouFerramenta = r.blocos.some(b => b.intencao !== 'resposta_llm') || r.produtos.length > 0;
-        if (usouFerramenta) return comModo(r, 'llm');
+        if (usouFerramenta) return comModo(r, 'externo');
         // o LLM respondeu em texto livre (sem ferramenta): não confiar em
-        // números; correr o fallback por regras que chama a ferramenta real.
-        const padrao = await processarPadrao(frase, ctx);
-        if (padrao.blocos.some(b => b.dados) || padrao.produtos.length) return comModo(padrao, 'regras');
-        // nada de dados no fallback -> aceitar a resposta conversacional do LLM
-        return comModo(r, 'llm');
+        // números; correr o motor interno por regras que chama a ferramenta real.
+        const interno = await processarPadrao(frase, ctx);
+        if (interno.blocos.some(b => b.dados) || interno.produtos.length) return comModo(interno, 'interno');
+        // nada de dados no motor interno -> aceitar a resposta conversacional do LLM
+        return comModo(r, 'externo');
       } catch (err) {
-        console.error('LLM falhou, a usar motor padrão:', err.message);
+        console.error('IA externa falhou, a usar o motor interno:', err.message);
       }
     }
-    return comModo(await processarPadrao(frase, ctx), 'regras');
+    return comModo(await processarPadrao(frase, ctx), 'interno');
   }
 
   return { processar, normalizar };
