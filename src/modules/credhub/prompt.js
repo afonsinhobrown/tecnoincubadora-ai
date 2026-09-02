@@ -27,7 +27,10 @@ export const PROMPT_CREDHUB = {
     clientes: 'contagem de clientes registados',
     top_clientes: 'clientes com maior volume de crédito',
     cobrancas: 'resumo de pagamentos recebidos',
-    buscar_cliente: 'busca de clientes por nome/documento'
+    buscar_cliente: 'busca de clientes por nome/documento',
+    emprestimos_estado: 'empréstimos por estado (ativo, atrasado, pago)',
+    atrasos: 'clientes em atraso e valores em risco',
+    grupos: 'grupos de crédito'
   },
 
   intencoes: [
@@ -58,6 +61,27 @@ export const PROMPT_CREDHUB = {
       titulo: '💳 Pagamentos recebidos',
       frases: ['pagamentos recebidos', 'quanto cobrei', 'resumo de cobranças', 'pagamentos do mês'],
       palavras: ['pagamentos', 'pagamento', 'cobrança', 'cobrancas', 'cobrei', 'recebido']
+    },
+    {
+      id: 'emprestimos_estado',
+      ferramenta: 'emprestimos_estado',
+      titulo: '📋 Empréstimos por estado',
+      frases: ['empréstimos por estado', 'quantos ativos', 'quantos atrasados', 'empréstimos pagos'],
+      palavras: ['emprestimo_estado', 'ativos', 'atrasados', 'pagos']
+    },
+    {
+      id: 'atrasos',
+      ferramenta: 'atrasos',
+      titulo: '⚠️ Atrasos',
+      frases: ['clientes em atraso', 'atrasos', 'quem deve', 'valores em risco'],
+      palavras: ['atraso', 'atrasos', 'em atraso', 'deve', 'risco']
+    },
+    {
+      id: 'grupos',
+      ferramenta: 'grupos',
+      titulo: '👥 Grupos',
+      frases: ['grupos de crédito', 'quantos grupos', 'grupos ativos'],
+      palavras: ['grupo', 'grupos']
     }
   ],
 

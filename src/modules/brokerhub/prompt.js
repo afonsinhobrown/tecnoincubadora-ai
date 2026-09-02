@@ -27,7 +27,11 @@ export const PROMPT_BROKERHUB = {
     clientes: 'contagem de clientes registados',
     top_produtos: 'clientes com maior volume de negócio',
     corretores: 'contagem de corretores',
-    leads: 'resumo de leads'
+    leads: 'resumo de leads',
+    apolices: 'apólices ativas e por seguradora',
+    sinistros: 'sinistros por estado',
+    comissoes: 'comissões por corretor e estado',
+    pipeline: 'funil de vendas por etapa'
   },
 
   intencoes: [
@@ -59,6 +63,34 @@ export const PROMPT_BROKERHUB = {
       titulo: '🤝 Corretores',
       frases: ['quantos corretores', 'corretores registados'],
       palavras: ['corretores', 'corretor']
+    },
+    {
+      id: 'apolices',
+      ferramenta: 'apolices',
+      titulo: '📄 Apólices',
+      frases: ['apólices ativas', 'quantas apólices', 'apólices por seguradora'],
+      palavras: ['apólice', 'apolices', 'seguro', 'seguradora']
+    },
+    {
+      id: 'sinistros',
+      ferramenta: 'sinistros',
+      titulo: '⚠️ Sinistros',
+      frases: ['sinistros abertos', 'quantos sinistros', 'sinistros por estado'],
+      palavras: ['sinistro', 'sinistros']
+    },
+    {
+      id: 'comissoes',
+      ferramenta: 'comissoes',
+      titulo: '💸 Comissões',
+      frases: ['comissões pendentes', 'comissões pagas', 'comissões por corretor'],
+      palavras: ['comissão', 'comissoes', 'comisao']
+    },
+    {
+      id: 'pipeline',
+      ferramenta: 'pipeline',
+      titulo: '🔄 Funil de vendas',
+      frases: ['funil de vendas', 'deals por etapa', 'pipeline'],
+      palavras: ['funil', 'pipeline', 'etapa']
     }
   ],
 

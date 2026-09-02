@@ -106,13 +106,65 @@ async function detalheProduto(id, restaurantId) {
   return { ...p[0], estoque: p[0].quantidade != null ? [{ quantidade: p[0].quantidade, preco_venda: p[0].preco_venda }] : [] };
 }
 
+async function pedidosEstado(restaurantId) {
+  const lista = await sql(`
+    SELECT status AS estado, count(*)::int AS total,
+           coalesce(sum("totalAmount"),0)::numeric(12,2) AS valor
+    FROM "Order"
+    WHERE "restaurantId" = $1
+    GROUP BY status ORDER BY total DESC
+  `, [restaurantId]);
+  const [totais] = await sql(`SELECT count(*)::int AS total FROM "Order" WHERE "restaurantId" = $1`, [restaurantId]);
+  return { totais, lista };
+}
+
+async function mesas(restaurantId) {
+  return sql(`
+    SELECT number AS numero, capacity AS capacidade, status, type AS tipo
+    FROM "Table"
+    WHERE "restaurantId" = $1
+    ORDER BY number ASC LIMIT 100
+  `, [restaurantId]);
+}
+
+async function reservas(restaurantId) {
+  return sql(`
+    SELECT "customerName" AS cliente, "customerPhone" AS telefone, date AS data,
+           guests AS pessoas, status, "tableId" AS mesa
+    FROM "Reservation"
+    WHERE "restaurantId" = $1
+    ORDER BY date DESC LIMIT 50
+  `, [restaurantId]);
+}
+
+async function despesas(restaurantId) {
+  const lista = await sql(`
+    SELECT description AS descricao, amount AS valor, category AS categoria,
+           date AS data, "paymentMethod" AS pagamento, "isPaid" AS pago
+    FROM "Expense"
+    WHERE "restaurantId" = $1
+    ORDER BY date DESC LIMIT 50
+  `, [restaurantId]);
+  const [totais] = await sql(`
+    SELECT count(*)::int AS total,
+           coalesce(sum(amount),0)::numeric(12,2) AS valor_total,
+           coalesce(sum(amount) FILTER (WHERE "isPaid"=true),0)::numeric(12,2) AS pago
+    FROM "Expense" WHERE "restaurantId" = $1
+  `, [restaurantId]);
+  return { totais, lista };
+}
+
 export const FERRAMENTAS_CAFEPOINT = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, restDe(p)),
   vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', restDe(p)),
   top_produtos: (p = {}) => topProdutos(restDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(restDe(p)),
   clientes: (p = {}) => resumoClientes(restDe(p)),
-  detalhe_produto: (p = {}) => detalheProduto(p.id, restDe(p))
+  detalhe_produto: (p = {}) => detalheProduto(p.id, restDe(p)),
+  pedidos_estado: (p = {}) => pedidosEstado(restDe(p)),
+  mesas: (p = {}) => mesas(restDe(p)),
+  reservas: (p = {}) => reservas(restDe(p)),
+  despesas: (p = {}) => despesas(restDe(p))
 };
 
 export async function executarFerramentaCafepoint(nome, params = {}) {

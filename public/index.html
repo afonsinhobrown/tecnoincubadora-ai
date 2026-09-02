@@ -470,7 +470,39 @@ function renderBloco(b) {
   else if (b.dados) renderDados(corpo, b.dados);
   const h = document.createElement('h3'); h.textContent = b.titulo;
   el.append(h, corpo);
+  const acoes = document.createElement('div');
+  acoes.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;';
+  const btnExp = document.createElement('button');
+  btnExp.textContent = '🔍 Explorar mais';
+  btnExp.style.cssText = 'background:var(--azul-claro);color:var(--azul);border:0;border-radius:999px;padding:6px 12px;font-size:.8rem;cursor:pointer;';
+  btnExp.onclick = () => explorarMais(b.titulo, b.intencao);
+  const btnDet = document.createElement('button');
+  btnDet.textContent = '➕ Adicionar detalhes';
+  btnDet.style.cssText = 'background:#fff;color:var(--azul);border:1px solid var(--borda);border-radius:999px;padding:6px 12px;font-size:.8rem;cursor:pointer;';
+  btnDet.onclick = () => adicionarDetalhes(b.titulo);
+  acoes.append(btnExp, btnDet);
+  el.append(acoes);
   elResp.appendChild(el);
+}
+
+function explorarMais(titulo, intencao) {
+  const sug = {
+    'vendas_periodo': 'mostrar mais detalhes e por forma de pagamento',
+    'top_produtos': 'mostrar top 20 e com categoria',
+    'estoque_baixo': 'mostrar com fornecedor e data de validade',
+    'clientes': 'mostrar lista completa com contacto',
+    'dentro': 'mostrar com telefone e última entrada',
+    'faturas': 'mostrar com cliente e método de pagamento',
+    'mensalidades': 'mostrar só as expiradas deste mês'
+  }[intencao] || 'com mais detalhes';
+  elQ.value = titulo + ' — ' + sug;
+  elQ.focus();
+  perguntar();
+}
+
+function adicionarDetalhes(titulo) {
+  const extra = prompt('Que detalhe queres adicionar para "' + titulo + '"? (ex. período, cliente, produto)');
+  if (extra && extra.trim()) { elQ.value = titulo + ' — ' + extra.trim(); perguntar(); }
 }
 
 function renderDados(container, dados) {

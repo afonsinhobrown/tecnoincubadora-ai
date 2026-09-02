@@ -28,6 +28,10 @@ export const PROMPT_ARMAZEM = {
     top_produtos: 'produtos mais movimentados/encomendados',
     estoque_baixo: 'produtos abaixo do mínimo ou esgotados',
     clientes: 'contagem de clientes/fornecedores',
+    faturas: 'faturas por estado e vencimento',
+    stock_local: 'stock por localização de armazém',
+    fornecedores: 'fornecedores ativos',
+    encomendas_estado: 'encomendas agrupadas por estado',
     detalhe_produto: 'ficha de um produto com preço e estoque'
   },
 
@@ -60,6 +64,34 @@ export const PROMPT_ARMAZEM = {
       titulo: '👥 Clientes e fornecedores',
       frases: ['quantos clientes tenho', 'quantos fornecedores', 'clientes registados'],
       palavras: ['clientes', 'cliente', 'fornecedores', 'fornecedor']
+    },
+    {
+      id: 'faturas',
+      ferramenta: 'faturas',
+      titulo: '🧾 Faturas',
+      frases: ['faturas pendentes', 'faturas pagas', 'faturas vencidas', 'lista de faturas'],
+      palavras: ['fatura', 'faturas', 'vencida', 'vencidas', 'pendente', 'pendentes']
+    },
+    {
+      id: 'stock_local',
+      ferramenta: 'stock_local',
+      titulo: '📍 Stock por localização',
+      frases: ['stock por localização', 'onde está o stock', 'localizações com stock', 'stock no armazém'],
+      palavras: ['localização', 'localizacao', 'armazém', 'armazem', 'local']
+    },
+    {
+      id: 'fornecedores',
+      ferramenta: 'fornecedores',
+      titulo: '🏭 Fornecedores',
+      frases: ['lista de fornecedores', 'fornecedores ativos', 'quem fornece'],
+      palavras: ['fornecedores', 'fornecedor']
+    },
+    {
+      id: 'encomendas_estado',
+      ferramenta: 'encomendas_estado',
+      titulo: '📦 Encomendas por estado',
+      frases: ['encomendas por estado', 'encomendas pendentes', 'encomendas entregues', 'estado das encomendas'],
+      palavras: ['encomenda_estado', 'encomendas pendentes', 'encomendas entregues']
     }
   ],
 

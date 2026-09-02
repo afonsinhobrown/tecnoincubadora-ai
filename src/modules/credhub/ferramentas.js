@@ -83,12 +83,42 @@ async function buscarCliente(termos, schema) {
   `, [t]);
 }
 
+async function emprestimosEstado(schema) {
+  return sql(`
+    SELECT coalesce(status,'—') AS estado, count(*)::int AS total,
+           coalesce(sum(amount),0)::numeric(12,2) AS valor,
+           coalesce(sum(balance),0)::numeric(12,2) AS saldo
+    FROM ${q(schema)}.loans
+    GROUP BY status ORDER BY total DESC
+  `);
+}
+
+async function atrasos(schema) {
+  return sql(`
+    SELECT c.full_name AS cliente, l.amount AS valor, l.balance AS saldo, l.status
+    FROM ${q(schema)}.loans l
+    JOIN ${q(schema)}.clients c ON c.id = l.client_id
+    WHERE l.balance > 0 AND l.status IN ('late','overdue','atrasado','active')
+    ORDER BY l.balance DESC LIMIT 50
+  `);
+}
+
+async function grupos(schema) {
+  // tenta várias tabelas de grupos
+  try {
+    return await sql(`SELECT count(*)::int AS grupos FROM ${q(schema)}.groups`);
+  } catch { return [{ grupos: 0 }]; }
+}
+
 export const FERRAMENTAS_CREDHUB = {
   carteira: (p = {}) => carteira(schemaDe(p)),
   clientes: (p = {}) => clientes(schemaDe(p)),
   top_clientes: (p = {}) => topClientes(schemaDe(p)),
   cobrancas: (p = {}) => cobrancas(schemaDe(p)),
-  buscar_cliente: (p = {}) => buscarCliente(p.termos, schemaDe(p))
+  buscar_cliente: (p = {}) => buscarCliente(p.termos, schemaDe(p)),
+  emprestimos_estado: (p = {}) => emprestimosEstado(schemaDe(p)),
+  atrasos: (p = {}) => atrasos(schemaDe(p)),
+  grupos: (p = {}) => grupos(schemaDe(p))
 };
 
 export async function executarFerramentaCredhub(nome, params = {}) {

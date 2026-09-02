@@ -110,13 +110,57 @@ async function detalheProduto(id, userId) {
   return { ...p[0], estoque: p[0].quantidade != null ? [{ quantidade: p[0].quantidade, preco_venda: p[0].preco_venda }] : [] };
 }
 
+async function faturas(userId) {
+  return sql(`
+    SELECT invoice_number AS numero, status, payment_status AS pagamento,
+           total, due_date AS vencimento
+    FROM invoices
+    WHERE user_id = $1
+    ORDER BY created_at DESC LIMIT 50
+  `, [userId]);
+}
+
+async function stockLocal(userId) {
+  return sql(`
+    SELECT coalesce(location,'—') AS localizacao,
+           count(*)::int AS produtos,
+           coalesce(sum(quantity),0)::int AS quantidade_total
+    FROM products
+    WHERE user_id = $1
+    GROUP BY location ORDER BY quantidade_total DESC
+  `, [userId]);
+}
+
+async function fornecedores(userId) {
+  return sql(`
+    SELECT name AS nome, coalesce(email,'—') AS email, coalesce(phone,'—') AS telefone
+    FROM suppliers
+    WHERE user_id = $1
+    ORDER BY name ASC LIMIT 100
+  `, [userId]);
+}
+
+async function encomendasEstado(userId) {
+  return sql(`
+    SELECT status, count(*)::int AS total,
+           coalesce(sum(total),0)::numeric(12,2) AS valor_total
+    FROM orders
+    WHERE user_id = $1
+    GROUP BY status ORDER BY total DESC
+  `, [userId]);
+}
+
 export const FERRAMENTAS_ARMAZEM = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, empresaDe(p)),
   vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', empresaDe(p)),
   top_produtos: (p = {}) => topProdutos(empresaDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(empresaDe(p)),
   clientes: (p = {}) => resumoClientes(empresaDe(p)),
-  detalhe_produto: (p = {}) => detalheProduto(p.id, empresaDe(p))
+  detalhe_produto: (p = {}) => detalheProduto(p.id, empresaDe(p)),
+  faturas: (p = {}) => faturas(empresaDe(p)),
+  stock_local: (p = {}) => stockLocal(empresaDe(p)),
+  fornecedores: (p = {}) => fornecedores(empresaDe(p)),
+  encomendas_estado: (p = {}) => encomendasEstado(empresaDe(p))
 };
 
 export async function executarFerramentaArmazem(nome, params = {}) {

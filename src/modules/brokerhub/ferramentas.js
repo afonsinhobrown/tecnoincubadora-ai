@@ -85,12 +85,55 @@ async function leads(tenantId) {
   return totais;
 }
 
+async function apolices(tenantId) {
+  return sql(`
+    SELECT numero AS apolice, cliente_nome AS cliente, seguradora, estado, premio AS valor
+    FROM apolices
+    WHERE tenant_id = $1 AND deleted = false
+    ORDER BY created_at DESC LIMIT 50
+  `, [tenantId]);
+}
+
+async function sinistros(tenantId) {
+  return sql(`
+    SELECT numero AS sinistro, cliente_nome AS cliente, estado, valor_estimado AS valor
+    FROM sinistros
+    WHERE tenant_id = $1 AND deleted = false
+    ORDER BY created_at DESC LIMIT 50
+  `, [tenantId]);
+}
+
+async function comissoes(tenantId) {
+  return sql(`
+    SELECT corretor_nome AS corretor, estado, count(*)::int AS deals,
+           coalesce(sum(valor_comissao),0)::numeric(12,2) AS total
+    FROM comissoes
+    WHERE tenant_id = $1
+    GROUP BY corretor_nome, estado ORDER BY total DESC LIMIT 50
+  `, [tenantId]);
+}
+
+async function pipeline(tenantId) {
+  return sql(`
+    SELECT ps.nome AS etapa, count(d.id)::int AS deals,
+           coalesce(sum(d.valor_estimado),0)::numeric(12,2) AS valor
+    FROM pipeline_stages ps
+    LEFT JOIN deals d ON d.pipeline_stage_id = ps.id AND d.tenant_id = ps.tenant_id AND d.deleted = false
+    WHERE ps.tenant_id = $1
+    GROUP BY ps.nome, ps.ordem ORDER BY ps.ordem
+  `, [tenantId]);
+}
+
 export const FERRAMENTAS_BROKERHUB = {
   vendas: (p = {}) => carteira(p.periodo ?? 'total', tenantDe(p)),
   clientes: (p = {}) => clientes(tenantDe(p)),
   top_produtos: (p = {}) => topClientes(tenantDe(p)),
   corretores: (p = {}) => corretores(tenantDe(p)),
-  leads: (p = {}) => leads(tenantDe(p))
+  leads: (p = {}) => leads(tenantDe(p)),
+  apolices: (p = {}) => apolices(tenantDe(p)),
+  sinistros: (p = {}) => sinistros(tenantDe(p)),
+  comissoes: (p = {}) => comissoes(tenantDe(p)),
+  pipeline: (p = {}) => pipeline(tenantDe(p))
 };
 
 export async function executarFerramentaBrokerhub(nome, params = {}) {

@@ -24,10 +24,14 @@ export const PROMPT_CAFEPOINT = {
 
   ferramentas: {
     buscar_produtos: 'busca de itens do menu por nome',
-    vendas: 'resumo de vendas e faturação por período (hoje | semana | mes | 30d)',
+    vendas: 'resumo de vendas e faturação por período (hoje | semana | mes | total)',
     top_produtos: 'itens mais vendidos',
     estoque_baixo: 'itens abaixo do mínimo ou esgotados',
-    clientes: 'contagem de clientes registados',
+    clientes: 'lista e contagem de clientes',
+    pedidos_estado: 'pedidos por estado (pendente, pago)',
+    mesas: 'mesas do restaurante e o seu estado',
+    reservas: 'reservas de mesas',
+    despesas: 'despesas do restaurante',
     detalhe_produto: 'ficha de um item do menu com preço e estoque'
   },
 
@@ -60,6 +64,34 @@ export const PROMPT_CAFEPOINT = {
       titulo: '👥 Clientes',
       frases: ['quantos clientes tenho', 'clientes novos', 'clientes registados'],
       palavras: ['clientes', 'cliente']
+    },
+    {
+      id: 'pedidos_estado',
+      ferramenta: 'pedidos_estado',
+      titulo: '🧾 Pedidos por estado',
+      frases: ['pedidos pendentes', 'pedidos pagos', 'estado dos pedidos', 'quantos pedidos em aberto'],
+      palavras: ['pedidos', 'pedido', 'pendente', 'pendentes', 'pagos', 'em aberto']
+    },
+    {
+      id: 'mesas',
+      ferramenta: 'mesas',
+      titulo: '🪑 Mesas',
+      frases: ['mesas ocupadas', 'mesas livres', 'estado das mesas', 'quantas mesas'],
+      palavras: ['mesas', 'mesa', 'ocupadas', 'livres', 'mesas do restaurante']
+    },
+    {
+      id: 'reservas',
+      ferramenta: 'reservas',
+      titulo: '📅 Reservas',
+      frases: ['reservas de hoje', 'reservas de mesa', 'reservas marcadas', 'lista de reservas'],
+      palavras: ['reservas', 'reserva']
+    },
+    {
+      id: 'despesas',
+      ferramenta: 'despesas',
+      titulo: '💸 Despesas',
+      frases: ['despesas do mês', 'despesas do restaurante', 'quanto gastei', 'despesas por categoria'],
+      palavras: ['despesas', 'despesa', 'gastei', 'gasto', 'despesa do mês']
     }
   ],
 
