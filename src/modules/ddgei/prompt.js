@@ -36,6 +36,7 @@ export const PROMPT_DDGEI = {
     movimento_material: 'movimentos de material eleitoral entre locais',
     material_sobrante: 'material sobrante (bom/mau) por local',
     relatorios: 'relatório tipo dashboard: inventário, entradas/saídas, movimentos e estatísticas (por equipamento, origem e marca)',
+    relatorio_insight: 'relatório próprio criado pela ferramenta: distribuição de funcionários por departamento, movimentos por tipo/estado, equipamentos por estado',
     buscar_equipamento: 'busca de equipamentos por nome/marca/série'
   },
 
@@ -130,6 +131,13 @@ export const PROMPT_DDGEI = {
       titulo: '📊 Relatórios',
       frases: ['relatório de movimentos', 'relatório de inventário', 'entradas e saídas', 'relatório do dashboard', 'estatísticas de equipamentos'],
       palavras: ['relatório', 'relatorio', 'entradas e saídas', 'entradas e saidas', 'estatísticas', 'estatisticas', 'dashboard']
+    },
+    {
+      id: 'relatorio_insight',
+      ferramenta: 'relatorio_insight',
+      titulo: '📈 Relatório próprio',
+      frases: ['resumo de funcionários por departamento', 'funcionários por departamento', 'movimentos por tipo', 'equipamentos por estado', 'visão geral do ddgei'],
+      palavras: ['funcionários por departamento', 'funcionarios por departamento', 'visão geral', 'visao geral', 'resumo geral', 'movimentos por tipo']
     }
   ],
 

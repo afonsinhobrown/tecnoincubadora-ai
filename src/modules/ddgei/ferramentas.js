@@ -208,6 +208,37 @@ async function relatorios({ consulta, abas = ['inventario', 'movimentos'] } = {}
   return { abas: abasFinal, pedido: c.global ? 'global' : 'especifico', ...out, estatisticas: { por_equipamento: stat_equip, por_origem: stat_setor, por_marca: stat_marca } };
 }
 
+// Relatório próprio da ferramenta (insight que o sistema não gera):
+// distribuição de funcionários por departamento + movimentos por tipo/estado
+async function relatorioInsight({ consulta } = {}) {
+  const c = extrairCriterio(consulta || '', [
+    { rotulo: 'funcionários', rotuloCurto: 'funcionarios', valor: 'funcionarios' },
+    { rotulo: 'departamento', rotuloCurto: 'departamento', valor: 'funcionarios' },
+    { rotulo: 'movimentos', rotuloCurto: 'movimentos', valor: 'movimentos' },
+    { rotulo: 'equipamentos', rotuloCurto: 'equipamentos', valor: 'equipamentos' }
+  ].map(d => ({ rotulo: d.rotulo, rotuloCurto: d.rotuloCurto, valor: d.valor })));
+  const alvo = c.global ? 'geral' : c.criterio.valor;
+
+  const insights = {};
+  if (alvo === 'geral' || alvo === 'funcionarios') {
+    insights.funcionarios_por_departamento = await sql(`
+      SELECT coalesce(s.nome,'(sem setor)') AS departamento, count(f.id)::int AS funcionarios
+      FROM funcionarios f LEFT JOIN setores s ON s.id = f.setor_id
+      GROUP BY s.nome ORDER BY funcionarios DESC`);
+  }
+  if (alvo === 'geral' || alvo === 'movimentos') {
+    insights.movimentos_por_tipo_estado = await sql(`
+      SELECT tipo, status, count(*)::int AS total
+      FROM movimentos GROUP BY tipo, status ORDER BY total DESC`);
+  }
+  if (alvo === 'geral' || alvo === 'equipamentos') {
+    insights.equipamentos_por_estado = await sql(`
+      SELECT coalesce(status,'—') AS estado, count(*)::int AS total
+      FROM inventario_local GROUP BY status ORDER BY total DESC`);
+  }
+  return { fonte: 'relatorio_criado_pela_ferramenta', pedido: c.global ? 'global' : 'especifico', abrangencia: alvo, insights };
+}
+
 export const FERRAMENTAS_DDGEI = {
   inventario: () => inventario(),
   tipos: () => tipos(),
@@ -222,6 +253,7 @@ export const FERRAMENTAS_DDGEI = {
   movimento_material: () => movimentoMaterial(),
   material_sobrante: () => materialSobrante(),
   relatorios: (p = {}) => relatorios(p),
+  relatorio_insight: (p = {}) => relatorioInsight(p),
   buscar_equipamento: (p = {}) => buscarEquipamento(p.termos)
 };
 
