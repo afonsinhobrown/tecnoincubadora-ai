@@ -258,6 +258,24 @@ async function acessos(periodo, gymId) {
   return { totais, lista };
 }
 
+// Relatório próprio da ferramenta (via BD): faturação por mês, planos ativos, dentro
+async function relatorioInsight(gymId) {
+  const [totais] = await sql(`
+    SELECT count(*)::int AS clientes,
+           count(*) FILTER (WHERE status='active')::int AS ativos
+    FROM clients WHERE ($1::text IS NULL OR gym_id::text = $1)`, [gymId]);
+  const faturacaoMes = await sql(`
+    SELECT to_char(to_date(date,'YYYY-MM-DD'),'YYYY-MM') AS mes,
+           count(*)::int AS faturas, coalesce(sum(amount),0)::numeric(12,2) AS total
+    FROM invoices WHERE ($1::text IS NULL OR gym_id::text = $1) AND status='pago' AND date<>''
+    GROUP BY mes ORDER BY mes DESC LIMIT 12`, [gymId]);
+  const planosAtivos = await sql(`
+    SELECT coalesce(plan_name,'—') AS plano, count(*)::int AS clientes
+    FROM clients WHERE ($1::text IS NULL OR gym_id::text = $1) AND status='active'
+    GROUP BY plan_name ORDER BY clientes DESC LIMIT 15`, [gymId]);
+  return { fonte: 'relatorio_criado_pela_ferramenta', totais, faturacao_por_mes: faturacaoMes, planos_mais_ativos: planosAtivos };
+}
+
 export const FERRAMENTAS_GYM = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, p.isSuperAdmin ? null : gymDe(p)),
   vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', p.isSuperAdmin ? null : gymDe(p), p.consulta),
@@ -271,7 +289,8 @@ export const FERRAMENTAS_GYM = {
   ranking_clientes: (p = {}) => rankingClientes(p.isSuperAdmin ? null : gymDe(p)),
   caixa: (p = {}) => caixa(p.isSuperAdmin ? null : gymDe(p)),
   faturacao_mes: (p = {}) => faturacaoMes(p.isSuperAdmin ? null : gymDe(p)),
-  acessos: (p = {}) => acessos(p.periodo ?? 'mes', p.isSuperAdmin ? null : gymDe(p))
+  acessos: (p = {}) => acessos(p.periodo ?? 'mes', p.isSuperAdmin ? null : gymDe(p)),
+  relatorio_insight: (p = {}) => relatorioInsight(p.isSuperAdmin ? null : gymDe(p))
 };
 
 export async function executarFerramentaGym(nome, params = {}) {

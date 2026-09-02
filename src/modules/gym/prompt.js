@@ -35,6 +35,7 @@ export const PROMPT_GYM = {
     caixa: 'sessões de caixa (abertas e fechadas) e saldos',
     faturacao_mes: 'faturação agregada por mês',
     acessos: 'clientes que acederam no período (via presenças)',
+    relatorio_insight: 'relatório próprio da ferramenta: faturação por mês, planos mais ativos, totais de alunos',
     detalhe_produto: 'ficha de um produto com preço e estoque'
   },
 
@@ -117,6 +118,13 @@ export const PROMPT_GYM = {
       frases: ['clientes que acederam', 'quem acedeu o ginásio', 'acessos deste mês', 'entradas no ginásio', 'quem entrou'],
       palavras: ['acederam', 'acedeu', 'acesso', 'acessos', 'entraram', 'entrou', 'presenças', 'presenca'],
       parametros: { periodo: 'auto' }
+    },
+    {
+      id: 'relatorio_insight',
+      ferramenta: 'relatorio_insight',
+      titulo: '📈 Relatório do ginásio',
+      frases: ['relatório do ginásio', 'faturação por mês', 'planos mais ativos', 'visão geral do ginásio', 'resumo geral'],
+      palavras: ['relatório do ginásio', 'relatorio do ginasio', 'visão geral', 'visao geral', 'resumo geral', 'planos mais ativos']
     }
   ],
 
