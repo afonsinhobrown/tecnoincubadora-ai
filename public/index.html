@@ -607,18 +607,59 @@ function renderBloco(b) {
   const h = document.createElement('h3'); h.textContent = b.titulo;
   el.append(h, corpo);
   const acoes = document.createElement('div');
-  acoes.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;';
-  const btnExp = document.createElement('button');
-  btnExp.textContent = '🔍 Explorar mais';
-  btnExp.style.cssText = 'background:var(--azul-claro);color:var(--azul);border:0;border-radius:999px;padding:6px 12px;font-size:.8rem;cursor:pointer;';
-  btnExp.onclick = () => explorarMais(b.titulo, b.intencao);
-  const btnDet = document.createElement('button');
-  btnDet.textContent = '➕ Adicionar detalhes';
-  btnDet.style.cssText = 'background:#fff;color:var(--azul);border:1px solid var(--borda);border-radius:999px;padding:6px 12px;font-size:.8rem;cursor:pointer;';
-  btnDet.onclick = () => adicionarDetalhes(b.titulo);
-  acoes.append(btnExp, btnDet);
+  acoes.style.cssText = 'display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;';
+  const novoBtn = (txt, fn, bg='var(--azul-claro)', cor='var(--azul)') => {
+    const bt = document.createElement('button');
+    bt.textContent = txt; bt.style.cssText = `background:${bg};color:${cor};border:0;border-radius:999px;padding:6px 12px;font-size:.8rem;cursor:pointer;`;
+    bt.onclick = fn; return bt;
+  };
+  const acoesLike = novoBtn('👍 Gostei', () => darFeedback(b, true));
+  const acoesDislike = novoBtn('👎 Não gostei', () => darFeedback(b, false), '#fee2e2', '#991b1b');
+  const acoesCopiar = novoBtn('📋 Copiar', () => copiarBloco(b));
+  const acoesShare = novoBtn('📤 Partilhar', () => partilharBloco(b), '#dcfce7', '#166534');
+  const btnExp = novoBtn('🔍 Explorar mais', () => explorarMais(b.titulo, b.intencao));
+  const btnDet = novoBtn('➕ Adicionar detalhes', () => adicionarDetalhes(b.titulo), '#fff', 'var(--azul)');
+  acoes.append(acoesLike, acoesDislike, acoesCopiar, acoesShare, btnExp, btnDet);
   el.append(acoes);
   elResp.appendChild(el);
+}
+
+function textoDoBloco(b) {
+  const linhas = [b.titulo || ''];
+  const d = b.dados;
+  const ser = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+  if (Array.isArray(d)) { d.slice(0, 30).forEach(r => linhas.push('- ' + Object.values(r).map(ser).join(' | '))); }
+  else if (d && typeof d === 'object') {
+    if (d.totais && typeof d.totais === 'object') Object.entries(d.totais).filter(([,v])=>typeof v!=='object').forEach(([k,v])=>linhas.push('• '+k.replace(/_/g,' ')+': '+v));
+    const lista = d.lista || d.por_forma_pagamento;
+    if (Array.isArray(lista)) lista.slice(0,30).forEach(r => linhas.push('- '+Object.values(r).map(ser).join(' | ')));
+  } else if (b.texto) linhas.push(b.texto);
+  return linhas.join('\n');
+}
+function copiarBloco(b) {
+  const t = 'TECNOINCUBADORA AI · ' + (getSistema()?.nome||'') + '\n' + textoDoBloco(b);
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(()=>alert('Copiado!')).catch(()=>fallbackCopy(t));
+  else fallbackCopy(t);
+}
+function fallbackCopy(t) { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); alert('Copiado!'); }
+function partilharBloco(b) {
+  const t = textoDoBloco(b);
+  window.open('https://wa.me/?text=' + encodeURIComponent('TECNOINCUBADORA AI · ' + (getSistema()?.nome||'') + '\n' + t), '_blank');
+}
+async function darFeedback(b, gostou) {
+  const token = getToken();
+  if (!token) { alert('Inicie sessão.'); return; }
+  let comentario = '';
+  if (!gostou) comentario = prompt('Que sugestão/comentário?', '') || '';
+  try {
+    const r = await fetch('/api/feedback', {
+      method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify({ sistemaSlug: getSistema()?.slug, query: ULTIMA_RESPOSTA?.query || '', blocoTitulo: b.titulo, blocoIntencao: b.intencao, gostou, comentario })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Erro');
+    alert(gostou ? 'Obrigado pelo feedback! 👍' : 'Feedback registado. Obrigado!');
+  } catch(e) { alert('Erro: '+e.message); }
 }
 
 function explorarMais(titulo, intencao) {
