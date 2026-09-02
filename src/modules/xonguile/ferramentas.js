@@ -26,15 +26,23 @@ function janelaTempo(periodo) {
   return inicio;
 }
 
-async function resumoVendas(periodo, salonId) {
+async function resumoVendas(periodo, salonId, consulta) {
   const inicio = periodo === 'total' ? null : janelaTempo(periodo);
+  // dicionário de formas de pagamento reais (Xonguile: Dinheiro, MPesa, etc.)
+  const formas = await sql(`SELECT DISTINCT "paymentMethod" FROM "Invoices" WHERE "paymentMethod" IS NOT NULL AND "paymentMethod"<>''`);
+  const dict = formas.map(f => ({ rotulo: String(f.paymentMethod).toLowerCase(), rotuloCurto: String(f.paymentMethod).toLowerCase(), valor: f.paymentMethod, sql: `"paymentMethod" = '${String(f.paymentMethod).replace(/'/g, "''")}'` }));
+  const c = extrairCriterio(consulta || '', dict.map(d => ({ rotulo: d.rotulo, rotuloCurto: d.rotuloCurto, valor: d.valor })));
+  const especifico = !c.global;
+  const item = especifico ? dict.find(d => d.valor === c.criterio.valor) : null;
+  const formaCond = item ? ` AND ${item.sql}` : '';
+  const filtroData = `($2::timestamptz IS NULL OR "createdAt" >= $2)`;
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum(total),0)::numeric(12,2) AS total,
            coalesce(avg(total),0)::numeric(12,2) AS ticket_medio
     FROM "Invoices"
     WHERE "SalonId" = $1 AND status <> 'voided' AND "paymentStatus" = 'paid'
-      AND ($2::timestamptz IS NULL OR "createdAt" >= $2)
+      AND ${filtroData}${formaCond}
   `, [salonId, inicio]);
   const porForma = await sql(`
     SELECT coalesce("paymentMethod",'—') AS forma_pagamento,
@@ -42,10 +50,10 @@ async function resumoVendas(periodo, salonId) {
            coalesce(sum(total),0)::numeric(12,2) AS total
     FROM "Invoices"
     WHERE "SalonId" = $1 AND status <> 'voided' AND "paymentStatus" = 'paid'
-      AND ($2::timestamptz IS NULL OR "createdAt" >= $2)
+      AND ${filtroData}${formaCond}
     GROUP BY "paymentMethod" ORDER BY total DESC
   `, [salonId, inicio]);
-  return { totais, por_forma_pagamento: porForma };
+  return { totais, por_forma_pagamento: porForma, pedido: especifico ? 'especifico' : 'global', filtro: item ? { forma_pagamento: item.valor } : undefined };
 }
 
 async function topProdutos(salonId) {
@@ -181,7 +189,7 @@ async function profissionais(salonId) {
 
 export const FERRAMENTAS_XONGUILE = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos, salaoDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', salaoDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', salaoDe(p), p.consulta),
   top_produtos: (p = {}) => topProdutos(salaoDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(salaoDe(p)),
   clientes: (p = {}) => resumoClientes(salaoDe(p)),
