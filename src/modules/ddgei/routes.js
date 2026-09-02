@@ -7,6 +7,7 @@ import { criarMotor } from '../../ai/motor.js';
 import { PROMPT_DDGEI } from './prompt.js';
 import { executarFerramentaDdgei } from './ferramentas.js';
 import { loginDdgei } from './auth.js';
+import { gerarGuiaPdf } from './guia.js';
 
 const motor = criarMotor(PROMPT_DDGEI, executarFerramentaDdgei, []);
 const router = express.Router();
@@ -48,6 +49,17 @@ router.post('/pergunta', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/ddgei/guia/:guia/pdf  -> download da ficha PDF da guia
+router.get('/guia/:guia/pdf', async (req, res) => {
+  try {
+    const buf = await gerarGuiaPdf(req.params.guia);
+    if (!buf) return res.status(404).json({ error: 'Guia não encontrada' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="guia_${req.params.guia}.pdf"`);
+    res.send(buf);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 export default router;
