@@ -97,6 +97,47 @@ async function movimentos() {
   return { totais, lista };
 }
 
+async function inventarioLocal(consulta) {
+  const dict = await (async () => {
+    const s = await sql(`SELECT DISTINCT setor_id, local_uso FROM inventario_local WHERE setor_id IS NOT NULL OR local_uso IS NOT NULL AND local_uso<>''`);
+    return [];
+  })();
+  const lista = await sql(`
+    SELECT id, equipamento AS equipamento, coalesce(marca,'—') AS marca,
+           coalesce(numero_serie,'—') AS numero_serie, quantidade::int AS quantidade,
+           coalesce(status,'—') AS estado, coalesce(local_uso,'—') AS local_uso
+    FROM inventario_local
+    ORDER BY local_uso, equipamento LIMIT 200
+  `);
+  const [totais] = await sql(`SELECT count(*)::int AS itens, count(*) FILTER (WHERE status='Disponível')::int AS disponiveis FROM inventario_local`);
+  return { totais, pedido: 'global', lista };
+}
+
+async function processosEleitorais() {
+  return sql(`SELECT id, nome, tipo, ano, coalesce(estado,'—') AS estado, data_inicio, data_fim FROM eleitoral_processo_eleitoral ORDER BY ano DESC`);
+}
+
+async function locaisArmazenamento() {
+  return sql(`SELECT id, coalesce(tipo,'—') AS tipo_local, coalesce(nome,'—') AS nome, activo AS ativo, parent_id AS local_pai FROM eleitoral_local_armazenamento ORDER BY nome LIMIT 200`);
+}
+
+async function tiposMaterial() {
+  return sql(`SELECT id, coalesce(categoria_id::text,'—') AS categoria, coalesce(nome,'—') AS nome, coalesce(variante,'') AS variante, coalesce(unidade_medida,'') AS unidade FROM eleitoral_tipo_material WHERE activo = 1 ORDER BY nome LIMIT 200`);
+}
+
+async function movimentoMaterial() {
+  const lista = await sql(`
+    SELECT m.id, p.nome AS processo, m.estado AS estado, m.data_envio, m.data_recepcao,
+           lo.nome AS local_origem, ld.nome AS local_destino
+    FROM eleitoral_movimento_material m
+    LEFT JOIN eleitoral_processo_eleitoral p ON p.id = m.processo_id
+    LEFT JOIN eleitoral_local_armazenamento lo ON lo.id = m.local_origem_id
+    LEFT JOIN eleitoral_local_armazenamento ld ON ld.id = m.local_destino_id
+    ORDER BY m.data_envio DESC LIMIT 100
+  `);
+  return { totais: { movimentos: lista.length }, lista };
+}
+
 async function materialSobrante() {
   const lista = await sql(`
     SELECT id, local_id AS local, tipo_material_id AS tipo_material,
@@ -130,6 +171,11 @@ export const FERRAMENTAS_DDGEI = {
   funcionarios: (p = {}) => funcionarios(p),
   setores: () => setores(),
   movimentos: () => movimentos(),
+  inventario_local: (p = {}) => inventarioLocal(p.consulta),
+  processos_eleitorais: () => processosEleitorais(),
+  locais_armazenamento: () => locaisArmazenamento(),
+  tipos_material: () => tiposMaterial(),
+  movimento_material: () => movimentoMaterial(),
   material_sobrante: () => materialSobrante(),
   buscar_equipamento: (p = {}) => buscarEquipamento(p.termos)
 };
