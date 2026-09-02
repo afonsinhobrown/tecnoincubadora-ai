@@ -6,6 +6,7 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 import { neon } from '@neondatabase/serverless';
+import { extrairCriterio } from '../../criterios/index.js';
 
 const sql = neon(process.env.GYMAR_DATABASE_URL);
 
@@ -71,23 +72,35 @@ async function estoqueBaixo(gymId) {
   `, [gymId]);
 }
 
-async function resumoClientes(gymId) {
+async function resumoClientes(gymId, consulta) {
+  const dict = [
+    { rotulo: 'ativos', rotuloCurto: 'ativos', valor: 'active', sql: `status = 'active'` },
+    { rotulo: 'activo', rotuloCurto: 'activo', valor: 'active', sql: `status = 'active'` },
+    { rotulo: 'expirados', rotuloCurto: 'expirados', valor: 'expired', sql: `status = 'expired'` },
+    { rotulo: 'vencidos', rotuloCurto: 'vencidos', valor: 'expired', sql: `status = 'expired'` },
+    { rotulo: 'inativos', rotuloCurto: 'inativos', valor: 'inactive', sql: `status = 'inactive'` }
+  ];
+  const c = extrairCriterio(consulta || '', dict.map(d => ({ rotulo: d.rotulo, rotuloCurto: d.rotuloCurto, valor: d.valor })));
+  const especifico = !c.global;
+  const item = especifico ? dict.find(d => d.valor === c.criterio.valor) : null;
+  const cond = item ? ` AND ${item.sql}` : '';
+
   const [totais] = await sql(`
     SELECT count(*)::int AS clientes,
            count(*) FILTER (WHERE status = 'active')::int AS ativos,
            0::int AS novos_30d
     FROM clients
-    WHERE ($1::text IS NULL OR gym_id::text = $1)
+    WHERE ($1::text IS NULL OR gym_id::text = $1)${cond}
   `, [gymId]);
   const lista = await sql(`
     SELECT id, name AS nome, phone AS telefone, coalesce(plan_name,'—') AS plano,
            status, coalesce(end_date,'') AS data_fim
     FROM clients
-    WHERE ($1::text IS NULL OR gym_id::text = $1)
+    WHERE ($1::text IS NULL OR gym_id::text = $1)${cond}
     ORDER BY name ASC
     LIMIT 100
   `, [gymId]);
-  return { totais, lista };
+  return { totais, pedido: especifico ? 'especifico' : 'global', filtro: item ? { estado: item.valor } : undefined, lista };
 }
 
 async function buscarProdutos(termos, gymId) {
@@ -244,7 +257,7 @@ export const FERRAMENTAS_GYM = {
   vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', p.isSuperAdmin ? null : gymDe(p)),
   top_produtos: (p = {}) => topProdutos(p.isSuperAdmin ? null : gymDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(p.isSuperAdmin ? null : gymDe(p)),
-  clientes: (p = {}) => resumoClientes(p.isSuperAdmin ? null : gymDe(p)),
+  clientes: (p = {}) => resumoClientes(p.isSuperAdmin ? null : gymDe(p), p.consulta),
   detalhe_produto: (p = {}) => detalheProduto(p.id, p.isSuperAdmin ? null : gymDe(p)),
   dentro: (p = {}) => quemDentro(p.isSuperAdmin ? null : gymDe(p)),
   faturas: (p = {}) => faturas(p.isSuperAdmin ? null : gymDe(p)),
