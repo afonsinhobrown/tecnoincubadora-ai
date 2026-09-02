@@ -1,6 +1,6 @@
 /**
  * Login do DDGEI. Password em dois formatos na BD:
- *  - pbkdf2 Werkzeug: `pbkdf2:sha256:600000$salt(b64)$hash(hex)`
+ *  - pbkdf2 Werkzeug: `pbkdf2:sha256:600000$salt$hash(base64)`
  *  - pbkdf2 Django: `pbkdf2_sha256$iterations$salt$hash(base64)`
  *  - MD5 hex (32 chars)
  */
@@ -17,12 +17,13 @@ function verificarPw(password, armazenado) {
   if (hash.startsWith('pbkdf2:')) {
     const partes = hash.split('$');
     if (partes.length !== 3) return false;
-    const [algoritmo, saltB64, hashHex] = partes;
+    const [algoritmo, salt, hashB64] = partes;
     const [, digest, iteracoes] = algoritmo.split(':');
     if (digest !== 'sha256' || !Number.isSafeInteger(Number(iteracoes))) return false;
-    const salt = Buffer.from(saltB64, 'base64');
-    const derivado = pbkdf2Sync(password, salt, Number(iteracoes), 32, 'sha256');
-    return derivado.toString('hex') === hashHex;
+    const tamanhoHash = Buffer.from(hashB64, 'base64').length;
+    if (!salt || !tamanhoHash) return false;
+    const derivado = pbkdf2Sync(password, salt, Number(iteracoes), tamanhoHash, 'sha256');
+    return derivado.toString('base64') === hashB64;
   }
 
   if (hash.startsWith('pbkdf2_sha256$')) {
