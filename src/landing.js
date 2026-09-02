@@ -153,8 +153,8 @@ export const LANDING_HTML = `<!DOCTYPE html>
     <div class="painel">
       <h2 id="login-titulo"></h2>
       <p class="sub" id="login-sub"></p>
-      <input class="campo" id="login-email" type="email" placeholder="Email do sistema">
-      <input class="campo" id="login-pass" type="password" placeholder="Password">
+      <input class="campo" id="login-email" type="text" autocomplete="username" placeholder="Utilizador ou email do sistema" onkeydown="if(event.key === 'Enter') entrar()">
+      <input class="campo" id="login-pass" type="password" autocomplete="current-password" placeholder="Password" onkeydown="if(event.key === 'Enter') entrar()">
       <button id="btn-login" onclick="entrar()">Entrar</button>
     </div>
   </section>
