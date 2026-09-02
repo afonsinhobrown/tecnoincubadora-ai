@@ -28,7 +28,7 @@ function farmaciaDe(params) {
 
 export const FERRAMENTAS = {
   buscar_produtos: (p = {}) => buscarProdutos(p.termos ?? '', 8, farmaciaDe(p)),
-  vendas: (p = {}) => resumoVendas(p.periodo ?? '30d', farmaciaDe(p)),
+  vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', farmaciaDe(p), p.consulta),
   top_produtos: (p = {}) => topProdutos(farmaciaDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(farmaciaDe(p)),
   pedidos_estado: (p = {}) => pedidosPorEstado(farmaciaDe(p)),

@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { extrairCriterio } from '../../criterios/index.js';
 
 const sql = neon(process.env.FARMACIA_DATABASE_URL);
 
@@ -18,26 +19,34 @@ function janelaTempo(periodo) {
   return inicio;
 }
 
-export async function resumoVendas(periodo, farmaciaId) {
+export async function resumoVendas(periodo, farmaciaId, consulta) {
   const inicio = periodo === 'total' ? null : janelaTempo(periodo);
+  // dicionário de formas de pagamento reais
+  const dict = ['DINHEIRO','MPESA','EMOLA','POS','TRANSFERENCIA','OUTROS'].map(fp =>
+    ({ rotulo: fp.toLowerCase(), rotuloCurto: fp.toLowerCase(), valor: fp, sql: `forma_pagamento = '${fp}'` }));
+  const c = extrairCriterio(consulta || '', dict.map(d => ({ rotulo: d.rotulo, rotuloCurto: d.rotuloCurto, valor: d.valor })));
+  const especifico = !c.global;
+  const item = especifico ? dict.find(d => d.valor === c.criterio.valor) : null;
+  const formaCond = item ? ` AND ${item.sql}` : '';
+  const filtroData = `($1::timestamptz IS NULL OR data_criacao >= $1)`;
   const [totais] = await sql(`
     SELECT count(*)::int AS pedidos,
            coalesce(sum(total),0)::numeric(12,2) AS total,
            coalesce(avg(total),0)::numeric(12,2) AS ticket_medio
     FROM pedidos_pedido
-    WHERE data_criacao >= $1 AND status NOT IN ('CANCELADO','cancelado')
-      AND farmacia_id = $2
+    WHERE ${filtroData} AND status NOT IN ('CANCELADO','cancelado')
+      AND farmacia_id = $2${formaCond}
   `, [inicio, farmaciaId]);
   const porForma = await sql(`
     SELECT coalesce(forma_pagamento,'—') AS forma_pagamento,
            count(*)::int AS pedidos,
            coalesce(sum(total),0)::numeric(12,2) AS total
     FROM pedidos_pedido
-    WHERE data_criacao >= $1 AND status NOT IN ('CANCELADO','cancelado')
-      AND farmacia_id = $2
+    WHERE ${filtroData} AND status NOT IN ('CANCELADO','cancelado')
+      AND farmacia_id = $2${formaCond}
     GROUP BY forma_pagamento ORDER BY total DESC
   `, [inicio, farmaciaId]);
-  return { totais, por_forma_pagamento: porForma };
+  return { totais, por_forma_pagamento: porForma, pedido: especifico ? 'especifico' : 'global', filtro: item ? { forma_pagamento: item.valor } : undefined };
 }
 
 export async function topProdutos(farmaciaId) {
