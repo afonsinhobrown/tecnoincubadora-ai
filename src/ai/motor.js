@@ -96,6 +96,13 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
               description: 'Período. "total" = tudo. Use período apenas se o utilizador o pedir explicitamente.' }
           }
         });
+      } else if (nome === 'funcionarios' && identidade.nome === 'Assistente DDGEI') {
+        add(nome, desc, {
+          type: 'OBJECT',
+          properties: {
+            setor: { type: 'STRING', description: 'Nome do setor ou departamento. Inclua sempre que o utilizador pedir funcionários de um setor específico.' }
+          }
+        });
       } else if (nome === 'fazer_venda') {
         add(nome, desc, {
           type: 'OBJECT',
@@ -292,6 +299,11 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
     return 'total';
   }
 
+  function extrairSetorDdgei(frase) {
+    const correspondencia = String(frase || '').match(/(?:do|da|de)\s+(?:setor|departamento)\s+(.+?)(?:[?!.,;]|$)/i);
+    return correspondencia?.[1]?.trim() || '';
+  }
+
   async function processarPadrao(frase, ctx) {
     const { buscarProdutos = async () => [], tenant } = ctx;
     const fraseNorm = normalizar(frase || '');
@@ -308,6 +320,10 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
         throw new Error(`Ferramenta "${intencao.ferramenta}" não autorizada no prompt de sistema`);
       }
       const params = { ...(intencao.parametros || {}), ...tenant };
+      if (intencao.ferramenta === 'funcionarios' && identidade.nome === 'Assistente DDGEI') {
+        const setor = extrairSetorDdgei(frase);
+        if (setor) params.setor = setor;
+      }
       if (params.periodo === 'auto') params.periodo = extrairPeriodo(fraseNorm);
       const dados = await ferramentas(intencao.ferramenta, params);
       blocos.push({ intencao: intencao.id, titulo: intencao.titulo, dados });

@@ -31,14 +31,16 @@ async function fornecedores() {
   return { totais: { fornecedores: lista.length, novos_30d: 0 }, lista };
 }
 
-async function funcionarios() {
+async function funcionarios({ setor } = {}) {
+  const termoSetor = String(setor || '').trim().toLowerCase();
   const lista = await sql(`
     SELECT f.id, f.nome, coalesce(f.cargo,'—') AS cargo, coalesce(s.nome,'—') AS setor
     FROM funcionarios f
     LEFT JOIN setores s ON s.id = f.setor_id
+    WHERE $1 = '' OR lower(coalesce(s.nome,'')) LIKE $2
     ORDER BY f.nome ASC LIMIT 100
-  `);
-  return { totais: { funcionarios: lista.length, novos_30d: 0 }, lista };
+  `, [termoSetor, `%${termoSetor}%`]);
+  return { totais: { funcionarios: lista.length, novos_30d: 0 }, filtro: termoSetor ? { setor } : undefined, lista };
 }
 
 async function setores() {
@@ -88,7 +90,7 @@ export const FERRAMENTAS_DDGEI = {
   inventario: () => inventario(),
   tipos: () => tipos(),
   fornecedores: () => fornecedores(),
-  funcionarios: () => funcionarios(),
+  funcionarios: (p = {}) => funcionarios(p),
   setores: () => setores(),
   movimentos: () => movimentos(),
   material_sobrante: () => materialSobrante(),
