@@ -118,11 +118,33 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
     return lista;
   }
 
-  // ── Chamada ao LLM (fornecedor configurável) ─────────────────────
-  // Normaliza a resposta em { functionCall?: {name,args}, text }.
+  // ── Chamada ao LLM com failover entre fornecedores ───────────────
+  // Ordem: LLM_PRIMARY (padrão "gemini") primeiro; depois os restantes
+  // que tenham chave. Se um falhar (quota/erro), passa ao seguinte.
+  const temGemini = !!process.env.GEMINI_API_KEY;
+  const temOpenRouter = !!process.env.LLM_API_KEY;
+
+  function ordemProvedores() {
+    const prim = (process.env.LLM_PRIMARY || 'gemini').toLowerCase();
+    const ordem = [];
+    if (prim === 'gemini' && temGemini) ordem.push('gemini');
+    if (prim === 'openrouter' && temOpenRouter) ordem.push('openrouter');
+    if (temGemini && !ordem.includes('gemini')) ordem.push('gemini');
+    if (temOpenRouter && !ordem.includes('openrouter')) ordem.push('openrouter');
+    return ordem;
+  }
+
   async function chamarLLM(frase) {
-    if (PROVIDER === 'openrouter') return chamarOpenRouter(frase);
-    return chamarGemini(frase);
+    const erros = [];
+    for (const prov of ordemProvedores()) {
+      try {
+        const r = prov === 'openrouter' ? await chamarOpenRouter(frase) : await chamarGemini(frase);
+        if (r) return r;
+      } catch (e) {
+        erros.push(`${prov}: ${e.message.split('\n')[0]}`);
+      }
+    }
+    throw new Error(erros.join(' | ') || 'Sem fornecedor LLM configurado');
   }
 
   async function chamarGemini(frase) {
