@@ -151,7 +151,7 @@ async function encomendasEstado(userId) {
 }
 
 export const FERRAMENTAS_ARMAZEM = {
-  buscar_produtos: (p = {}) => buscarProdutos(p.termos, empresaDe(p)),
+  buscar_produtos: (p = {}) => buscarProdutos(p.termos ?? p.consulta, empresaDe(p)),
   vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', empresaDe(p)),
   top_produtos: (p = {}) => topProdutos(empresaDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(empresaDe(p)),

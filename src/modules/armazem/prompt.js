@@ -91,7 +91,7 @@ export const PROMPT_ARMAZEM = {
       ferramenta: 'encomendas_estado',
       titulo: '📦 Encomendas por estado',
       frases: ['encomendas por estado', 'encomendas pendentes', 'encomendas entregues', 'estado das encomendas'],
-      palavras: ['encomenda_estado', 'encomendas pendentes', 'encomendas entregues']
+      palavras: ['encomenda', 'encomendas', 'entregue', 'entregues', 'pendente', 'pendentes', 'processamento', 'estado das encomendas']
     }
   ],
 
