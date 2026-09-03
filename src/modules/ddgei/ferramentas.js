@@ -138,20 +138,47 @@ async function movimentoMaterial() {
   return { totais: { movimentos: lista.length }, lista };
 }
 
-async function materialSobrante() {
+async function provinciasDicionario() {
+  const rows = await sql(`SELECT id, nome FROM eleitoral_provincia WHERE activo = 1 ORDER BY nome`);
+  return rows.map(p => ({ rotulo: p.nome, rotuloCurto: p.nome, valor: p.id, campo: 'provincia_id' }));
+}
+
+async function materialSobrante({ provincia } = {}) {
+  let criterio = null;
+  if (provincia && String(provincia).trim()) {
+    const dicionario = await provinciasDicionario();
+    const c = extrairCriterio(String(provincia), dicionario);
+    if (!c.global) criterio = c.criterio;
+  }
+
+  const where = criterio ? `WHERE la.provincia_id = $1` : '';
+  const params = criterio ? [criterio.valor] : [];
+
   const lista = await sql(`
-    SELECT id, local_id AS local, tipo_material_id AS tipo_material,
-           quantidade_total::int AS quantidade_total, quantidade_bom::int AS bom, quantidade_mau::int AS mau
-    FROM eleitoral_material_sobrante
-    ORDER BY id DESC LIMIT 50
-  `);
+    SELECT ms.id, coalesce(la.nome, ms.local_id::text) AS local,
+           p.nome AS provincia, tm.nome AS tipo_material,
+           ms.quantidade_total::int AS quantidade_total, ms.quantidade_bom::int AS bom, ms.quantidade_mau::int AS mau
+    FROM eleitoral_material_sobrante ms
+    LEFT JOIN eleitoral_local_armazenamento la ON la.id = ms.local_id
+    LEFT JOIN eleitoral_provincia p ON p.id = la.provincia_id
+    LEFT JOIN eleitoral_tipo_material tm ON tm.id = ms.tipo_material_id
+    ${where}
+    ORDER BY ms.id DESC LIMIT 50
+  `, ...params);
   const [totais] = await sql(`
     SELECT count(*)::int AS registos,
-           coalesce(sum(quantidade_bom),0)::int AS total_bom,
-           coalesce(sum(quantidade_mau),0)::int AS total_mau
-    FROM eleitoral_material_sobrante
-  `);
-  return { totais, lista };
+           coalesce(sum(ms.quantidade_bom),0)::int AS total_bom,
+           coalesce(sum(ms.quantidade_mau),0)::int AS total_mau
+    FROM eleitoral_material_sobrante ms
+    LEFT JOIN eleitoral_local_armazenamento la ON la.id = ms.local_id
+    ${where}
+  `, ...params);
+  return {
+    totais,
+    pedido: criterio ? 'especifico' : 'global',
+    filtro: criterio ? { provincia: criterio.valor } : undefined,
+    lista
+  };
 }
 
 async function buscarEquipamento(termos) {
@@ -251,7 +278,7 @@ export const FERRAMENTAS_DDGEI = {
   locais_armazenamento: () => locaisArmazenamento(),
   tipos_material: () => tiposMaterial(),
   movimento_material: () => movimentoMaterial(),
-  material_sobrante: () => materialSobrante(),
+  material_sobrante: (p = {}) => materialSobrante(p),
   relatorios: (p = {}) => relatorios(p),
   relatorio_insight: (p = {}) => relatorioInsight(p),
   buscar_equipamento: (p = {}) => buscarEquipamento(p.termos)

@@ -103,6 +103,13 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
             setor: { type: 'STRING', description: 'Nome do setor ou departamento. Inclua sempre que o utilizador pedir funcionários de um setor específico.' }
           }
         });
+      } else if (nome === 'material_sobrante' && identidade.nome === 'Assistente DDGEI') {
+        add(nome, desc, {
+          type: 'OBJECT',
+          properties: {
+            provincia: { type: 'STRING', description: 'Nome da provincia (ex: "Cidade de Maputo", "Gaza", "Nampula"). Inclua sempre que o utilizador pedir material sobrante de uma provincia específica.' }
+          }
+        });
       } else if (nome === 'fazer_venda') {
         add(nome, desc, {
           type: 'OBJECT',
@@ -304,6 +311,11 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
     return correspondencia?.[1]?.trim() || '';
   }
 
+  function extrairProvinciaDdgei(frase) {
+    const correspondencia = String(frase || '').match(/(?:da|de|em|no|na)\s+(?:provincia\s+(?:de\s+)?|cidade\s+de\s+)?(.+?)(?:[?!.,;]|$)/i);
+    return correspondencia?.[1]?.trim() || '';
+  }
+
   async function processarPadrao(frase, ctx) {
     const { buscarProdutos = async () => [], tenant } = ctx;
     const fraseNorm = normalizar(frase || '');
@@ -323,6 +335,10 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
       if (intencao.ferramenta === 'funcionarios' && identidade.nome === 'Assistente DDGEI') {
         const setor = extrairSetorDdgei(frase);
         if (setor) params.setor = setor;
+      }
+      if (intencao.ferramenta === 'material_sobrante' && identidade.nome === 'Assistente DDGEI') {
+        const provincia = extrairProvinciaDdgei(frase);
+        if (provincia) params.provincia = provincia;
       }
       if (params.periodo === 'auto') params.periodo = extrairPeriodo(fraseNorm);
       const dados = await ferramentas(intencao.ferramenta, params);

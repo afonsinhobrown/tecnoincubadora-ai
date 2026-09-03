@@ -87,8 +87,8 @@ export const PROMPT_DDGEI = {
       id: 'material_sobrante',
       ferramenta: 'material_sobrante',
       titulo: '📦 Material sobrante',
-      frases: ['material sobrante', 'sobras', 'material bom e mau'],
-      palavras: ['sobrante', 'sobras', 'material bom', 'material mau', 'material']
+      frases: ['material sobrante', 'sobras', 'material bom e mau', 'sobrantes da provincia', 'material sobrante por provincia'],
+      palavras: ['sobrante', 'sobrantes', 'sobras', 'material bom', 'material mau']
     },
     {
       id: 'inventario_local',
