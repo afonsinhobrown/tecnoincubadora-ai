@@ -115,9 +115,56 @@ async function resumoVotacao({ ano, tipo, provincia, distrito, posto, localidade
  */
 async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, partido } = {}) {
   if (ano === undefined || ano === null || ano === '') ano = await anoMaisRecente();
-  const { where, params } = construirFiltro({ ano, tipo, provincia, distrito, posto }, true);
 
-  // traz por partido ordenado, decifra e soma no JS
+  const partidoNorm = partido && String(partido).trim() ? norm(partido) : null;
+  const matchPartido = (nome) => {
+    const n = norm(nome);
+    return partidoNorm ? (n === partidoNorm || n.includes(partidoNorm) || partidoNorm.includes(n)) : true;
+  };
+
+  // ── Modo "separar por província": partido+ano sem círculo eleitoral ──
+  if (agrupar === 'provincia' && !provincia && !distrito && !posto) {
+    const { where, params } = construirFiltro({ ano, tipo }, true);
+    const linhas = await sql(`
+      SELECT UPPER(e.provincia) AS provincia, UPPER(r.nome_partido) AS partido, r.votos AS voto
+      FROM resultados_partidos r
+      JOIN eleicoes e ON e.id = r.eleicao_id
+      ${where}
+    `, params);
+
+    // agrega TODOS os partidos por província (para calcular a % de cada um)
+    const porProv = new Map(); // provincia -> Map(partido->votos)
+    for (const l of linhas) {
+      const pv = l.provincia || '(sem província)';
+      if (!porProv.has(pv)) porProv.set(pv, new Map());
+      const m = porProv.get(pv);
+      m.set(l.partido, (m.get(l.partido) || 0) + decifrarInt(l.voto));
+    }
+
+    const vencedorPorProvincia = [];
+    const por_provincia = [];
+    for (const [nome, mp] of porProv) {
+      const todos = [...mp.entries()].map(([p, votos]) => ({ partido: p, votos })).sort((a, b) => b.votos - a.votos);
+      const totalProv = todos.reduce((s, x) => s + x.votos, 0);
+      if (todos.length) vencedorPorProvincia.push({ provincia: nome, partido: todos[0].partido, votos: todos[0].votos });
+      const selecao = todos.filter(x => matchPartido(x.partido));
+      for (const x of selecao) por_provincia.push({ provincia: nome, partido: x.partido, votos: x.votos, pct: totalProv ? Math.round((x.votos / totalProv) * 1000) / 10 : 0 });
+    }
+
+    const vencedorGeral = [...porProv.values()]
+      .flatMap(m => [...m.entries()].map(([p, v]) => ({ partido: p, votos: v })))
+      .reduce((acc, x) => { acc[x.partido] = (acc[x.partido] || 0) + x.votos; return acc; }, {});
+    const venc = Object.entries(vencedorGeral).map(([p, v]) => ({ partido: p, votos: v })).filter(x => matchPartido(x.partido)).sort((a, b) => b.votos - a.votos)[0] || null;
+
+    return {
+      agrupado_por: 'provincia', total_votos: venc ? venc.votos : 0, vencedor: venc,
+      por_provincia, vencedor_por_provincia: vencedorPorProvincia,
+      filtro: { ano, tipo, partido: partido || null }
+    };
+  }
+
+  // ── Modo normal (âmbito único ou círculo eleitoral indicado) ──
+  const { where, params } = construirFiltro({ ano, tipo, provincia, distrito, posto }, true);
   const linhas = await sql(`
     SELECT UPPER(r.nome_partido) AS partido, r.votos AS voto
     FROM resultados_partidos r
@@ -127,27 +174,17 @@ async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, part
 
   const mapa = new Map();
   for (const l of linhas) {
-    const v = decifrarInt(l.voto);
-    mapa.set(l.partido, (mapa.get(l.partido) || 0) + v);
+    if (!matchPartido(l.partido)) continue;
+    mapa.set(l.partido, (mapa.get(l.partido) || 0) + decifrarInt(l.voto));
   }
-  let lista = [...mapa.entries()]
+  const lista = [...mapa.entries()]
     .map(([partido, votos]) => ({ partido, votos }))
     .sort((a, b) => b.votos - a.votos);
 
-  const filtro = { ano, tipo, provincia, distrito, posto, partido: partido || null };
-  // se o utilizador pediu um partido específico, limita a esse partido
-  if (partido && String(partido).trim()) {
-    const p = norm(partido);
-    const sel = lista.filter(x => norm(x.partido).includes(p) || norm(x.partido) === p);
-    lista = sel.length ? sel : [];
-  }
-
   const total = lista.reduce((s, x) => s + x.votos, 0);
   const comPct = lista.map(x => ({ ...x, pct: total ? Math.round((x.votos / total) * 1000) / 10 : 0 }));
-
-  // vencedor
   const vencedor = comPct.length ? { partido: comPct[0].partido, votos: comPct[0].votos, pct: comPct[0].pct } : null;
-  return { total_votos: total, partidos: comPct, vencedor, filtro };
+  return { total_votos: total, partidos: comPct, vencedor, filtro: { ano, tipo, provincia, distrito, posto, partido: partido || null } };
 }
 
 /**
