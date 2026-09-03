@@ -128,9 +128,10 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
           properties: {
             ano: { type: 'STRING', description: 'Ano da eleição. Usa apenas se o utilizador o pedir.' },
             tipo: { type: 'STRING', description: 'Tipo de eleição (ex: autárquica).' },
-            provincia: { type: 'STRING', description: 'Província (ex: "Gaza", "Maputo", "Nampula"). Use sempre que o utilizador citar uma província.' },
+            provincia: { type: 'STRING', description: 'Província (ex: "Gaza", "Maputo", "Nampula"). Apenas o nome da província, sem outros termos. Use sempre que o utilizador citar uma província.' },
             distrito: { type: 'STRING', description: 'Distrito.' },
             posto: { type: 'STRING', description: 'Posto administrativo.' },
+            partido: { type: 'STRING', description: 'Nome de um partido (ex: "FRELIMO", "RENAMO") para limitar os resultados a esse partido. Use apenas se o utilizador nomear um partido.' },
             agrupar: { type: 'STRING', description: 'Agrupar resultados por "provincia" ou deixar vazio para o total geral do âmbito.' }
           }
         });

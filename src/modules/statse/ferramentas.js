@@ -113,7 +113,7 @@ async function resumoVotacao({ ano, tipo, provincia, distrito, posto, localidade
  * `resultados_partidos` (unidos a `eleicoes` para respeitar o filtro territorial).
  * agrupar: 'geral' (soma tudo) ou 'provincia'.
  */
-async function resultados({ ano, tipo, provincia, distrito, posto, agrupar } = {}) {
+async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, partido } = {}) {
   if (ano === undefined || ano === null || ano === '') ano = await anoMaisRecente();
   const { where, params } = construirFiltro({ ano, tipo, provincia, distrito, posto }, true);
 
@@ -130,16 +130,24 @@ async function resultados({ ano, tipo, provincia, distrito, posto, agrupar } = {
     const v = decifrarInt(l.voto);
     mapa.set(l.partido, (mapa.get(l.partido) || 0) + v);
   }
-  const lista = [...mapa.entries()]
+  let lista = [...mapa.entries()]
     .map(([partido, votos]) => ({ partido, votos }))
     .sort((a, b) => b.votos - a.votos);
+
+  const filtro = { ano, tipo, provincia, distrito, posto, partido: partido || null };
+  // se o utilizador pediu um partido específico, limita a esse partido
+  if (partido && String(partido).trim()) {
+    const p = norm(partido);
+    const sel = lista.filter(x => norm(x.partido).includes(p) || norm(x.partido) === p);
+    lista = sel.length ? sel : [];
+  }
 
   const total = lista.reduce((s, x) => s + x.votos, 0);
   const comPct = lista.map(x => ({ ...x, pct: total ? Math.round((x.votos / total) * 1000) / 10 : 0 }));
 
   // vencedor
   const vencedor = comPct.length ? { partido: comPct[0].partido, votos: comPct[0].votos, pct: comPct[0].pct } : null;
-  return { total_votos: total, partidos: comPct, vencedor, filtro: { ano, tipo, provincia, distrito, posto } };
+  return { total_votos: total, partidos: comPct, vencedor, filtro };
 }
 
 /**

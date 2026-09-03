@@ -27,7 +27,7 @@ export const PROMPT_STATSE = {
   ferramentas: {
     resumo_estrutura: 'cobertura e estrutura: número de mesas/locais de voto, localidades e distritos, por província e por ano/tipo (aceita ano, tipo, provincia, distrito, posto, localidade)',
     resumo_votacao: 'totais de votação: eleitores inscritos, votantes, votos válidos/nulos/brancos, abstenções e participação num âmbito (ano, provincia, distrito, posto, localidade)',
-    resultados: 'resultados por partido: votos de cada partido e vencedor num âmbito (ano, provincia, distrito, posto; opcional agrupar por provincia)',
+    resultados: 'resultados por partido: votos de cada partido e vencedor num âmbito (ano, provincia, distrito, posto; opcional um partido específico e opcional agrupar por provincia)',
     buscar: 'pesquisa de mesas/locais de voto, localidades, distritos ou código de assembleia por palavra-chave (opcional ano)',
     relatorio_insight: 'relatório próprio criado pela ferramenta: distribuição de partidos e vencedor por província para um ano'
   },
