@@ -131,8 +131,8 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
             provincia: { type: 'STRING', description: 'Província (ex: "Gaza", "Maputo", "Nampula"). Apenas o nome da província, sem outros termos. Use sempre que o utilizador citar uma província.' },
             distrito: { type: 'STRING', description: 'Distrito.' },
             posto: { type: 'STRING', description: 'Posto administrativo.' },
-            partido: { type: 'STRING', description: 'Nome de um partido (ex: "FRELIMO", "RENAMO") para limitar os resultados a esse partido. Use apenas se o utilizador nomear um partido.' },
-            agrupar: { type: 'STRING', description: 'Agrupar resultados por "provincia" ou deixar vazio para o total geral do âmbito.' }
+            partido: { type: 'STRING', description: 'Nome de um partido (ex: "FRELIMO", "RENAMO") para destacar nas respostas. Use apenas se o utilizador nomear um partido.' },
+            agrupar: { type: 'STRING', enum: ['provincia', 'distrito', 'posto', 'localidade'], description: 'Divide os resultados por zona. Use "distrito" se o utilizador pedir "por distrito", "provincia" se pedir "por província", etc. Deixe vazio para o total geral do âmbito.' }
           }
         });
       } else if (identidade.nome === 'Assistente StatsE' && nome === 'buscar') {

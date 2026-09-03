@@ -113,7 +113,7 @@ async function resumoVotacao({ ano, tipo, provincia, distrito, posto, localidade
  * `resultados_partidos` (unidos a `eleicoes` para respeitar o filtro territorial).
  * agrupar: 'geral' (soma tudo) ou 'provincia'.
  */
-async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, partido } = {}) {
+async function resultados({ ano, tipo, provincia, distrito, posto, localidade, agrupar, partido } = {}) {
   if (ano === undefined || ano === null || ano === '') ano = await anoMaisRecente();
 
   const partidoNorm = partido && String(partido).trim() ? norm(partido) : null;
@@ -122,44 +122,48 @@ async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, part
     return partidoNorm ? (n === partidoNorm || n.includes(partidoNorm) || partidoNorm.includes(n)) : true;
   };
 
-  // ── Modo "separar por província": partido+ano sem círculo eleitoral ──
-  if (agrupar === 'provincia' && !provincia && !distrito && !posto) {
-    const { where, params } = construirFiltro({ ano, tipo }, true);
+  // ── Modo "agrupar por zona": por província/distrito/posto/localidade (como o /api/analise) ──
+  const AGNUIVEL = { provincia: 'provincia', provincial: 'provincia', distrito: 'distrito', distrital: 'distrito', posto: 'posto_administrativo', 'posto administrativo': 'posto_administrativo', localidade: 'localidade' };
+  let zonaCol = null;
+  if (agrupar) {
+    const a = norm(agrupar);
+    for (const [k, col] of Object.entries(AGNUIVEL)) if (a === norm(k)) { zonaCol = col; break; }
+  }
+  if (zonaCol) {
+    const zonaAlias = zonaCol === 'posto_administrativo' ? 'posto' : zonaCol;
+    const { where, params } = construirFiltro({ ano, tipo, provincia, distrito, posto, localidade }, true);
     const linhas = await sql(`
-      SELECT UPPER(e.provincia) AS provincia, UPPER(r.nome_partido) AS partido, r.votos AS voto
+      SELECT UPPER(e.${zonaCol}) AS zona, UPPER(r.nome_partido) AS partido, r.votos AS voto
       FROM resultados_partidos r
       JOIN eleicoes e ON e.id = r.eleicao_id
       ${where}
     `, params);
 
-    // agrega TODOS os partidos por província (para calcular a % de cada um)
-    const porProv = new Map(); // provincia -> Map(partido->votos)
+    const porZona = new Map(); // zona -> Map(partido->votos)
     for (const l of linhas) {
-      const pv = l.provincia || '(sem província)';
-      if (!porProv.has(pv)) porProv.set(pv, new Map());
-      const m = porProv.get(pv);
+      const z = l.zona || ('(sem ' + zonaAlias + ')');
+      if (!porZona.has(z)) porZona.set(z, new Map());
+      const m = porZona.get(z);
       m.set(l.partido, (m.get(l.partido) || 0) + decifrarInt(l.voto));
     }
 
-    const vencedorPorProvincia = [];
-    const por_provincia = [];
-    for (const [nome, mp] of porProv) {
+    const vencedorPorZona = [];
+    const por_zona = [];
+    for (const [nome, mp] of porZona) {
       const todos = [...mp.entries()].map(([p, votos]) => ({ partido: p, votos })).sort((a, b) => b.votos - a.votos);
-      const totalProv = todos.reduce((s, x) => s + x.votos, 0);
-      if (todos.length) vencedorPorProvincia.push({ provincia: nome, partido: todos[0].partido, votos: todos[0].votos });
-      // mostra todos os partidos (adversários) por província
-      for (const x of todos) por_provincia.push({ provincia: nome, partido: x.partido, votos: x.votos, pct: totalProv ? Math.round((x.votos / totalProv) * 1000) / 10 : 0 });
+      const totalZona = todos.reduce((s, x) => s + x.votos, 0);
+      if (todos.length) vencedorPorZona.push({ [zonaAlias]: nome, partido: todos[0].partido, votos: todos[0].votos });
+      for (const x of todos) por_zona.push({ [zonaAlias]: nome, partido: x.partido, votos: x.votos, pct: totalZona ? Math.round((x.votos / totalZona) * 1000) / 10 : 0 });
     }
 
-    const vencedorGeral = [...porProv.values()]
-      .flatMap(m => [...m.entries()].map(([p, v]) => ({ partido: p, votos: v })))
-      .reduce((acc, x) => { acc[x.partido] = (acc[x.partido] || 0) + x.votos; return acc; }, {});
-    const venc = Object.entries(vencedorGeral).map(([p, v]) => ({ partido: p, votos: v })).sort((a, b) => b.votos - a.votos)[0] || null;
+    const totalGeralMap = new Map();
+    for (const [, mp] of porZona) for (const [p, v] of mp) totalGeralMap.set(p, (totalGeralMap.get(p) || 0) + v);
+    const venc = [...totalGeralMap.entries()].map(([p, v]) => ({ partido: p, votos: v })).sort((a, b) => b.votos - a.votos)[0] || null;
 
     return {
-      agrupado_por: 'provincia', total_votos: venc ? venc.votos : 0, vencedor: venc,
-      por_provincia, vencedor_por_provincia: vencedorPorProvincia,
-      filtro: { ano, tipo, partido: partido || null }
+      agrupado_por: zonaAlias, total_votos: venc ? venc.votos : 0, vencedor: venc,
+      por_zona, vencedor_por_zona: vencedorPorZona,
+      filtro: { ano, tipo, provincia, distrito, posto, partido: partido || null }
     };
   }
 
