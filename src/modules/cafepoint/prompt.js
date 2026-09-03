@@ -57,7 +57,7 @@ export const PROMPT_CAFEPOINT = {
       ferramenta: 'estoque_baixo',
       titulo: '⚠️ Itens a repor',
       frases: ['o que repor', 'estoque baixo', 'itens a acabar', 'o que está esgotado'],
-      palavras: ['repor', 'reposição', 'reposicao', 'baixo', 'esgotado', 'acabando', 'mínimo', 'minimo', 'stock']
+      palavras: ['repor', 'reposição', 'reposicao', 'esgotado', 'acabando', 'mínimo', 'minimo', 'stock']
     },
     {
       id: 'clientes',

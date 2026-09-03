@@ -82,17 +82,90 @@ async function resumoClientes(restaurantId) {
   return { totais, lista };
 }
 
-async function buscarProdutos(termos, restaurantId) {
-  const t = `%${String(termos || '').toLowerCase()}%`;
-  const r = await sql(`
-    SELECT id, name AS nome, category AS nome_generico, price AS preco_venda,
-           "stockQuantity" AS quantidade
+// Palavras comuns que não identificam produto (para extrair termos de busca)
+const STOPWORDS = new Set([
+  'quero', 'queria', 'gostaria', 'preciso', 'procuro', 'procurar', 'pesquisar', 'pesquisa',
+  'buscar', 'busca', 'lista', 'listar', 'ver', 'mostrar', 'mostre', 'tem', 'existe', 'ha', 'há',
+  'fazer', 'comprar', 'compra', 'produtos', 'produto', 'itens', 'item', 'menu', 'cardapio', 'menú',
+  'preco', 'preço', 'custam', 'disponivel', 'disponível', 'sobre', 'para', 'por', 'com', 'sem',
+  'de', 'do', 'da', 'dos', 'das', 'no', 'na', 'nos', 'nas', 'em', 'um', 'uma', 'uns', 'umas',
+  'o', 'a', 'os', 'as', 'e', 'ou', 'que', 'qual', 'quais', 'onde', 'como', 'todos', 'todas',
+  'tipo', 'algum', 'alguma', 'por favor', 'favor', 'obrigado', 'oi', 'ola', 'olá', 'bom',
+  'dia', 'tarde', 'boa', 'mim', 'me', 'meu', 'minha', 'custa', 'quanto', 'custaquanto'
+]);
+
+// Remove acentos + minúsculas para comparação (mesma regra no JS e no SQL)
+const ACENTOS = 'áàâãäéèêëíìîïóòôõöúùûüçñýÿ';
+const SEM_ACENTOS = 'aaaaaeeeeiiiiooooouuuucnyy';
+
+function normalizar(texto) {
+  return String(texto || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+// Extrai termos úteis de uma frase: "quero ver os cafes" -> ["cafe"]
+function extrairTermos(stringUsuario, extra = null) {
+  const fonte = (extra ? normalizar(extra) + ' ' : '') + normalizar(stringUsuario);
+  return fonte
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .split(/\s+/)
+    .filter(p => p.length > 1 && !STOPWORDS.has(p));
+}
+
+async function buscarProdutos(termos, restaurantId, extra = null) {
+  const termosUteis = extrairTermos(termos, extra);
+
+  // Sem termos úteis: devolve os itens mais recentes do menu
+  if (termosUteis.length === 0) {
+    return sql(`
+      SELECT id, name AS nome, category AS categoria, price AS preco_venda,
+             "stockQuantity" AS quantidade
+      FROM "MenuItem"
+      WHERE "restaurantId" = $1
+      ORDER BY id DESC
+      LIMIT 8
+    `, [restaurantId]);
+  }
+
+  const condicoes = [];
+  const params = [];
+  const scoreParts = [];
+  let i = 2;
+  // nome numa coluna normalizada sem acentos; barcode usa busca por prefixo
+  const colNameNorm = `translate(lower(name), '${ACENTOS}', '${SEM_ACENTOS}')`;
+  const colCatNorm = `translate(lower(category), '${ACENTOS}', '${SEM_ACENTOS}')`;
+
+  for (const termo of termosUteis) {
+    // Código de barras (6+ dígitos): busca exata por prefixo
+    if (/^\d{6,}$/.test(termo)) {
+      condicoes.push(`barcode ILIKE $${i}`);
+      scoreParts.push(`CASE WHEN barcode ILIKE $${i} THEN 10 ELSE 0 END`);
+      params.push(`${termo}%`);
+      i++;
+      continue;
+    }
+    for (const [col, score] of [[colNameNorm, 4], [colCatNorm, 2]]) {
+      const p = i++;
+      condicoes.push(`${col} LIKE $${p}`);
+      scoreParts.push(`CASE WHEN ${col} LIKE $${p} THEN ${score} ELSE 0 END`);
+      params.push(`%${termo}%`);
+    }
+  }
+
+  const query = `
+    SELECT id, name AS nome, category AS categoria, price AS preco_venda,
+           "stockQuantity" AS quantidade,
+           round(((${scoreParts.join(' + ')})::numeric), 2) AS relevancia
     FROM "MenuItem"
-    WHERE "restaurantId" = $1 AND lower(name) LIKE $2
-    ORDER BY name ASC
+    WHERE "restaurantId" = $1 AND (${condicoes.join(' OR ')})
+    ORDER BY relevancia DESC, name ASC
     LIMIT 8
-  `, [restaurantId, t]);
-  return r;
+  `;
+
+  return sql(query, [restaurantId, ...params]);
 }
 
 async function detalheProduto(id, restaurantId) {
@@ -156,7 +229,7 @@ async function despesas(restaurantId) {
 }
 
 export const FERRAMENTAS_CAFEPOINT = {
-  buscar_produtos: (p = {}) => buscarProdutos(p.termos, restDe(p)),
+  buscar_produtos: (p = {}) => buscarProdutos(p.termos, restDe(p), p.consulta),
   vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', restDe(p)),
   top_produtos: (p = {}) => topProdutos(restDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(restDe(p)),

@@ -48,7 +48,8 @@ router.post('/pergunta', async (req, res) => {
   if (cached) return res.json({ ...cached, modo: 'cache', licenca: _lic });
   const { blocos, produtos, modo } = await motor.processar(query, ctx);
     await registrarUsoPrompt({ sistemaSlug: 'cafepoint', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId) });
-      try { await registrarAuditoria({ sistemaSlug: 'cafepoint' || _lic.plano || 'unknown', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId || ''), tenantNome: _lic.lic?.tenant_nome || '', usuarioId: String(req.ctx.usuarioId||''), usuarioNome: '', query, modo, plano: _lic.plano, licencaStatus: _lic.lic?.status || '', ip: req.ip }); } catch {}
+      try { await registrarAuditoria({ sistemaSlug: 'cafepoint', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId || ''), tenantNome: _lic.lic?.tenant_nome || '', usuarioId: String(req.ctx.usuarioId||''), usuarioNome: '', query, modo, plano: _lic.plano, licencaStatus: _lic.lic?.status || '', ip: req.ip }); } catch {}
+    if (blocos.length || produtos.length) await setCache({ sistemaSlug: 'cafepoint', tenantId: String(req.ctx.farmaciaId || req.ctx.usuarioId), query, resposta: { blocos, produtos, total_produtos: produtos.length, modo } });
     res.json({ blocos, produtos, total_produtos: produtos.length, modo, licenca: _lic });
   } catch (err) {
     res.status(500).json({ error: err.message });
