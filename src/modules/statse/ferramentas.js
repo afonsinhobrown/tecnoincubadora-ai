@@ -215,25 +215,34 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
   const segundo = participantes[1] || null;
   const participacao_pct = inscritos ? Math.round((votantes / inscritos) * 1000) / 10 : 0;
 
+  const foco = partidoNorm || null;
   const escopo = provincia ? ('província de ' + String(provincia).trim().toLowerCase()) : (distrito ? ('distrito de ' + String(distrito).trim().toLowerCase()) : 'a nível nacional');
+  const idxFoco = foco ? partidosAnalise.findIndex(p => matchPartido(p.partido)) : -1;
+  const focoRow = idxFoco >= 0 ? partidosAnalise[idxFoco] : null;
+  const ordFoco = idxFoco >= 0 ? (['1º', '2º', '3º', '4º', '5º'][idxFoco] || ((idxFoco + 1) + 'º')) : null;
+
   const trechos = [];
-  if (vencAnalise) {
+  if (focoRow) {
+    // centra a resposta no partido que o utilizador pediu
+    const ehLider = idxFoco === 0;
+    trechos.push(`Resultados do ${focoRow.partido} em ${escopo} no ano ${ano}: ${focoRow.votos.toLocaleString('pt-MZ')} votos (${focoRow.percentual_validos}% dos votos válidos; ${focoRow.percentual_inscritos}% dos inscritos), ${ordFoco} lugar.`);
+    if (ehLider) {
+      if (segundo) {
+        const margem = focoRow.votos - segundo.votos;
+        trechos.push(`Está à frente com ${margem.toLocaleString('pt-MZ')} votos sobre o ${segundo.partido} (${segundo.percentual_validos}%).`);
+      }
+    } else if (vencAnalise) {
+      const atraso = vencAnalise.votos - focoRow.votos;
+      trechos.push(`Fica ${atraso.toLocaleString('pt-MZ')} votos atrás do líder ${vencAnalise.partido} (${vencAnalise.percentual_validos}%).`);
+    }
+  } else if (vencAnalise) {
     trechos.push(`O ${vencAnalise.partido} lidera em ${escopo} no ano ${ano} com ${vencAnalise.votos.toLocaleString('pt-MZ')} votos (${vencAnalise.percentual_validos}% dos votos válidos; ${vencAnalise.percentual_inscritos}% dos inscritos).`);
     if (segundo) {
       const margem = vencAnalise.votos - segundo.votos;
       trechos.push(`Vantagem de ${margem.toLocaleString('pt-MZ')} votos sobre o ${segundo.partido} (${segundo.percentual_validos}%).`);
     }
   }
-  // nota sobre o partido que o utilizador indicou (foco), se não for o líder
-  const foco = partidoNorm || null;
-  if (foco && vencAnalise && !matchPartido(vencAnalise.partido)) {
-    const idx = partidosAnalise.findIndex(p => matchPartido(p.partido));
-    if (idx >= 0) {
-      const p = partidosAnalise[idx];
-      const ord = ['1º', '2º', '3º', '4º', '5º'][idx] || ((idx + 1) + 'º');
-      trechos.push(`O ${p.partido} que indicaste ficou em ${ord} lugar com ${p.votos.toLocaleString('pt-MZ')} votos (${p.percentual_validos}% dos votos válidos).`);
-    }
-  }
+  if (foco && !focoRow) trechos.push(`O partido ${String(partido)} não tem resultados registados neste círculo/ano; segue a distribuição real dos partidos com votos.`);
   if (inscritos) trechos.push(`Participação de ${participacao_pct}% (${votantes.toLocaleString('pt-MZ')} votaram de ${inscritos.toLocaleString('pt-MZ')} inscritos; abstenção de ${(100 - participacao_pct).toFixed(1)}%).`);
   const analise = { texto: trechos.join(' '), inscritos, votantes, participacao_pct };
 
@@ -279,13 +288,23 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
       tendencia = { ano_actual: Number(ano), ano_anterior: prevAno, evolucao, nulos_brancos: nulosBrancos, nulos_brancos_anterior: nbPrev, abstenção_actual: Math.round((100 - participacao_pct) * 10) / 10, abstenção_anterior: totPrevV ? Math.round((100 - (votPrev / totPrevV) * 100) * 10) / 10 : null };
 
       const rec = [];
-      if (lider) {
+      // se o utilizador indicou um partido, centra a recomendação nesse partido
+      const alvo = (foco && evolucao.find(e => matchPartido(e.partido))) || null;
+      if (alvo) {
+        if (subiu(alvo)) rec.push(`O ${alvo.partido} subiu ${alvo.delta_pct} pontos vs ${prevAno} (${alvo.pct_anterior}% → ${alvo.pct}%) — tendência favorável; vale reforçar onde cresceu e consolidar o avanço.`);
+        else if (desceu(alvo)) rec.push(`Atenção: o ${alvo.partido} que pediste caiu ${Math.abs(alvo.delta_pct)} pontos vs ${prevAno} (${alvo.pct_anterior}% → ${alvo.pct}%) — investigar a perda e agir antes do próximo ciclo.`);
+        else if (alvo.pct_anterior != null) rec.push(`O ${alvo.partido} manteve-se estável vs ${prevAno} (${alvo.pct}%) — sem grandes ganhos nem perdas; procurar margem nos indecisos.`);
+      }
+      if (!alvo && lider) {
         if (subiu(lider)) rec.push(`O ${lider.partido} subiu ${lider.delta_pct} pontos face a ${prevAno} (${lider.pct_anterior}% → ${lider.pct}%) — tendência favorável; recomenda-se consolidar a base e alargar nos distritos onde está mais fraco.`);
         else if (desceu(lider)) rec.push(`Atenção: o ${lider.partido} caiu ${Math.abs(lider.delta_pct)} pontos vs ${prevAno} — investigar perda e reforçar a mobilização.`);
       }
-      // alerta sobre rivais em subida
-      const rivaisSubindo = evolucao.slice(1, 4).filter(subiu);
-      for (const r of rivaisSubindo) rec.push(`Alerta: o rival ${r.partido} cresceu ${r.delta_pct} pontos vs ${prevAno} (${r.pct_anterior}% → ${r.pct}%) — a sua evolução ameaça; monitorizar de perto.`);
+      // quem ameaça o partido pedido (ou o líder)
+      const ameacador = alvo ? alvo : lider;
+      if (ameacador) {
+        const rivaisSubindo = evolucao.filter(e => e.partido !== ameacador.partido && e.votos <= ameacador.votos && subiu(e)).slice(0, 2);
+        for (const r of rivaisSubindo) rec.push(`Alerta: ${r.partido} cresceu ${r.delta_pct} pontos vs ${prevAno} (${r.pct_anterior}% → ${r.pct}%) — aproxima-se; monitorizar de perto.`);
+      }
       // nulos/brancos como sinal
       const pctNB = votantes ? Math.round((nulosBrancos / votantes) * 1000) / 10 : 0;
       const pctNBPrev = votPrev ? Math.round((nbPrev / votPrev) * 1000) / 10 : 0;
