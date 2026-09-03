@@ -34,7 +34,9 @@ export const SISTEMAS = [
   { slug: 'ddgei',         nome: 'DDGEI',            emoji: '⚙️', desc: 'Gestão de equipamentos e materiais',                            implementado: true, apiPath: '/api/ddgei',
     exemplos: ['resumo do inventário', 'tipos de equipamento', 'quantos fornecedores', 'quantos funcionários'] },
   { slug: 'wms',           nome: 'Smart Warehouse WMS', emoji: '📦', desc: 'Sistema de armazém (standalone)',                             implementado: true, apiPath: '/api/armazem',
-    exemplos: ['quantas encomendas hoje', 'faturação do mês', 'produtos mais movimentados', 'produtos a repor'] }
+    exemplos: ['quantas encomendas hoje', 'faturação do mês', 'produtos mais movimentados', 'produtos a repor'] },
+  { slug: 'statse',        nome: 'StatsE',            emoji: '📊', desc: 'Análise e consulta de processos eleitorais',                    implementado: true, apiPath: '/api/statse',
+    exemplos: ['quantas mesas de voto em Gaza', 'resultados por partido em Maputo', 'quem ganhou em 2023', 'quantos eleitores inscritos em Nampula'] }
 ];
 
 export function sistemaPorSlug(slug) {

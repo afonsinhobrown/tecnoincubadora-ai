@@ -12,6 +12,7 @@ import { loginMachamba } from '../machamba/auth.js';
 import { loginSmartschool } from '../smartschool/auth.js';
 import { loginBrokerhub } from '../brokerhub/auth.js';
 import { loginEntregas } from '../entregas/auth.js';
+import { loginStatse } from '../statse/auth.js';
 
 const router = express.Router();
 
@@ -81,6 +82,9 @@ router.post('/:slug/login', async (req, res) => {
         break;
       case 'entregasmoz':
         res.json(await loginEntregas(email, password));
+        break;
+      case 'statse':
+        res.json(await loginStatse(email, password));
         break;
       default:
         res.status(501).json({ error: 'Login deste sistema ainda não implementado.' });

@@ -14,6 +14,7 @@ import machambaRouter from './modules/machamba/routes.js';
 import smartschoolRouter from './modules/smartschool/routes.js';
 import brokerhubRouter from './modules/brokerhub/routes.js';
 import entregasRouter from './modules/entregas/routes.js';
+import statseRouter from './modules/statse/routes.js';
 import licencaRouter from './licencas/routes.js';
 import auditoriaRouter from './auditoria/routes.js';
 import feedbackRouter from './feedback/routes.js';
@@ -68,6 +69,9 @@ app.use('/api/brokerhub', brokerhubRouter);
 
 // Módulo EntregasMOZ (delivery)
 app.use('/api/entregas', entregasRouter);
+
+// Módulo StatsE (análise de processos eleitorais)
+app.use('/api/statse', statseRouter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', sistema: 'TECNOINCUBADORA AI' }));
 

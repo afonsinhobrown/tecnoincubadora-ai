@@ -110,6 +110,39 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
             provincia: { type: 'STRING', description: 'Nome da provincia (ex: "Cidade de Maputo", "Gaza", "Nampula"). Inclua sempre que o utilizador pedir material sobrante de uma provincia específica.' }
           }
         });
+      } else if (identidade.nome === 'Assistente StatsE' && ['resumo_estrutura', 'resumo_votacao'].includes(nome)) {
+        add(nome, desc, {
+          type: 'OBJECT',
+          properties: {
+            ano: { type: 'STRING', description: 'Ano da eleição (ex: "2023"). Use apenas se o utilizador o pedir.' },
+            tipo: { type: 'STRING', description: 'Tipo de eleição (ex: "autárquica").' },
+            provincia: { type: 'STRING', description: 'Província (ex: "Gaza", "Maputo", "Nampula"). Use sempre que o utilizador citar uma província.' },
+            distrito: { type: 'STRING', description: 'Distrito.' },
+            posto: { type: 'STRING', description: 'Posto administrativo.' },
+            localidade: { type: 'STRING', description: 'Localidade.' }
+          }
+        });
+      } else if (identidade.nome === 'Assistente StatsE' && nome === 'resultados') {
+        add(nome, desc, {
+          type: 'OBJECT',
+          properties: {
+            ano: { type: 'STRING', description: 'Ano da eleição (ex: "2023"). Use apenas se o utilizador o pedir.' },
+            tipo: { type: 'STRING', description: 'Tipo de eleição (ex: "autárquica").' },
+            provincia: { type: 'STRING', description: 'Província (ex: "Gaza", "Maputo", "Nampula"). Use sempre que o utilizador citar uma província.' },
+            distrito: { type: 'STRING', description: 'Distrito.' },
+            posto: { type: 'STRING', description: 'Posto administrativo.' },
+            agrupar: { type: 'STRING', description: 'Agrupar resultados por "provincia" ou deixar vazio para o total geral do âmbito.' }
+          }
+        });
+      } else if (identidade.nome === 'Assistente StatsE' && nome === 'buscar') {
+        add(nome, desc, {
+          type: 'OBJECT',
+          properties: {
+            termo: { type: 'STRING', description: 'Palavra-chave a procurar (local de voto, localidade, distrito ou código de assembleia).' },
+            ano: { type: 'STRING', description: 'Ano da eleição (opcional).' }
+          },
+          required: ['termo']
+        });
       } else if (nome === 'fazer_venda') {
         add(nome, desc, {
           type: 'OBJECT',

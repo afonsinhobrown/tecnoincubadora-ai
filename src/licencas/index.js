@@ -19,6 +19,7 @@ const UNLIMITED_KEYWORDS = ['nachingweya','encubadora','tecnoincubadora','tecnoi
 function isUnlimited({ sistemaSlug, tenantNome, userNome, isSuperAdmin }) {
   if (isSuperAdmin) return { unlimited: true, motivo: 'Superadmin — acesso ilimitado' };
   if (sistemaSlug === 'ddgei') return { unlimited: true, motivo: 'Licença Temporária gerida pelo desenvolvedor' };
+  if (sistemaSlug === 'statse') return { unlimited: true, motivo: 'Licença Temporária gerida pelo desenvolvedor' };
   const hay = `${tenantNome||''} ${userNome||''}`.toLowerCase();
   if (UNLIMITED_KEYWORDS.some(k => hay.includes(k))) return { unlimited: true, motivo: 'Acesso ilimitado (tenant/user especial)' };
   return { unlimited: false };
