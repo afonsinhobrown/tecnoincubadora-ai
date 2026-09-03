@@ -114,8 +114,8 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
         add(nome, desc, {
           type: 'OBJECT',
           properties: {
-            ano: { type: 'STRING', description: 'Ano da eleição (ex: "2023"). Use apenas se o utilizador o pedir.' },
-            tipo: { type: 'STRING', description: 'Tipo de eleição (ex: "autárquica").' },
+            ano: { type: 'STRING', description: 'Ano da eleição. Usa apenas se o utilizador o pedir.' },
+            tipo: { type: 'STRING', description: 'Tipo de eleição (ex: autárquica).' },
             provincia: { type: 'STRING', description: 'Província (ex: "Gaza", "Maputo", "Nampula"). Use sempre que o utilizador citar uma província.' },
             distrito: { type: 'STRING', description: 'Distrito.' },
             posto: { type: 'STRING', description: 'Posto administrativo.' },
@@ -126,8 +126,8 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
         add(nome, desc, {
           type: 'OBJECT',
           properties: {
-            ano: { type: 'STRING', description: 'Ano da eleição (ex: "2023"). Use apenas se o utilizador o pedir.' },
-            tipo: { type: 'STRING', description: 'Tipo de eleição (ex: "autárquica").' },
+            ano: { type: 'STRING', description: 'Ano da eleição. Usa apenas se o utilizador o pedir.' },
+            tipo: { type: 'STRING', description: 'Tipo de eleição (ex: autárquica).' },
             provincia: { type: 'STRING', description: 'Província (ex: "Gaza", "Maputo", "Nampula"). Use sempre que o utilizador citar uma província.' },
             distrito: { type: 'STRING', description: 'Distrito.' },
             posto: { type: 'STRING', description: 'Posto administrativo.' },

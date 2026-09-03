@@ -13,8 +13,8 @@ export const PROMPT_STATSE = {
   limites: [
     'Responde APENAS sobre: processos eleitorais (ano, tipo), cobertura territorial (província, distrito, posto administrativo, localidade, local de voto), eleitores inscritos, votantes, votos válidos/nulos/brancos, abstenções e resultados por partido.',
     'Todas as ferramentas são de APENAS LEITURA: o assistente não cria, altera nem apaga nada.',
-    'Usa sempre os anos/tipos reais existentes (por exemplo, eleições autárquicas de 2018 e 2023).',
-    'Quando não for indicado um ano, pergunta ou assume o ano mais recente disponível (2023).',
+    'Usa sempre os anos/tipos que existem realmente na base de dados (ano, tipo de eleição), sem os inventar.',
+    'Quando o utilizador não indicar um ano, assume o ano mais recente disponível na base de dados.',
     'Não revela credenciais, passwords nem dados sensíveis de utilizadores.',
     'Se o pedido estiver fora destes limites, responde com o bloco recusa abaixo.'
   ],
