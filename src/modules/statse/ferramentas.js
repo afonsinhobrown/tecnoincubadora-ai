@@ -193,11 +193,16 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
   // percentual de votos válidos e percentual sobre os inscritos por partido + participação
   const { where: whereE, params: paramsE } = construirFiltro({ ano, tipo, provincia, distrito, posto }, false);
   const totRows = await sql(`
-    SELECT eleitores_inscritos AS ins, total_votantes AS vot, votos_validos AS val
+    SELECT eleitores_inscritos AS ins, total_votantes AS vot, votos_validos AS val,
+           votos_nulos AS nul, votos_branco AS bran
     FROM eleicoes e ${whereE}
   `, paramsE);
-  let inscritos = 0, votantes = 0;
-  for (const t of totRows) { inscritos += decifrarInt(t.ins); votantes += decifrarInt(t.vot); }
+  let inscritos = 0, votantes = 0, nulosBrancos = 0;
+  for (const t of totRows) {
+    inscritos += decifrarInt(t.ins);
+    votantes += decifrarInt(t.vot);
+    nulosBrancos += decifrarInt(t.nul) + decifrarInt(t.bran);
+  }
 
   const partidosAnalise = comPct.map(x => ({
     partido: x.partido, votos: x.votos,
@@ -232,10 +237,79 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
   if (inscritos) trechos.push(`Participação de ${participacao_pct}% (${votantes.toLocaleString('pt-MZ')} votaram de ${inscritos.toLocaleString('pt-MZ')} inscritos; abstenção de ${(100 - participacao_pct).toFixed(1)}%).`);
   const analise = { texto: trechos.join(' '), inscritos, votantes, participacao_pct };
 
+  // ── Tendência vs ano anterior + recomendações ─────────────────────
+  let tendencia = null, recomendacoes = null;
+  try {
+    // ano anterior existente no mesmo círculo
+    const { where: whereC, params: paramsC } = construirFiltro({ tipo, provincia, distrito, posto }, false);
+    const anosDisponiveis = await sql(`SELECT DISTINCT ano_eleicao::int AS a FROM eleicoes e ${whereC} ORDER BY a`, paramsC);
+    const anos = anosDisponiveis.map(x => x.a);
+    const prevAno = anos.filter(a => a < Number(ano)).sort((x, y) => y - x)[0];
+
+    if (prevAno !== undefined) {
+      // stats do ano anterior (partidos com join + totais na tabela simples)
+      const { where: wp, params: pp } = construirFiltro({ ano: prevAno, tipo, provincia, distrito, posto }, true);
+      const linhasPrev = await sql(`
+        SELECT UPPER(r.nome_partido) AS partido, r.votos AS voto
+        FROM resultados_partidos r JOIN eleicoes e ON e.id = r.eleicao_id ${wp}
+      `, pp);
+      const { where: ws, params: ps } = construirFiltro({ ano: prevAno, tipo, provincia, distrito, posto }, false);
+      const totPrevSimples = await sql(`
+        SELECT eleitores_inscritos AS ins, total_votantes AS vot, votos_nulos AS nul, votos_branco AS bran
+        FROM eleicoes e ${ws}
+      `, ps);
+      const mPrev = new Map();
+      for (const l of linhasPrev) mPrev.set(l.partido, (mPrev.get(l.partido) || 0) + decifrarInt(l.voto));
+      const partPrev = [...mPrev.entries()].map(([p, v]) => ({ partido: p, votos: v })).sort((a, b) => b.votos - a.votos);
+      const totPrevV = totPrevSimples.reduce((s, t) => s + decifrarInt(t.ins), 0);
+      const votPrev = totPrevSimples.reduce((s, t) => s + decifrarInt(t.vot), 0);
+      const nbPrev = totPrevSimples.reduce((s, t) => s + decifrarInt(t.nul) + decifrarInt(t.bran), 0);
+      const somaValPrev = partPrev.reduce((s, x) => s + x.votos, 0) || 1;
+
+      const evolucao = partidosAnalise.slice(0, 5).map(p => {
+        const ant = partPrev.find(x => norm(x.partido) === norm(p.partido));
+        const votosPrev = ant ? ant.votos : 0;
+        const pctPrev = ant && somaValPrev ? Math.round((ant.votos / somaValPrev) * 1000) / 10 : 0;
+        const deltaPct = Math.round((p.percentual_validos - pctPrev) * 10) / 10;
+        return { partido: p.partido, ano, votos: p.votos, pct: p.percentual_validos, votos_anterior: votosPrev, pct_anterior: pctPrev, delta_pct: deltaPct, delta_votos: p.votos - votosPrev };
+      });
+      const subiu = (e) => e.delta_pct > 0.4;
+      const desceu = (e) => e.delta_pct < -0.4;
+      const lider = evolucao[0];
+      tendencia = { ano_actual: Number(ano), ano_anterior: prevAno, evolucao, nulos_brancos: nulosBrancos, nulos_brancos_anterior: nbPrev, abstenção_actual: Math.round((100 - participacao_pct) * 10) / 10, abstenção_anterior: totPrevV ? Math.round((100 - (votPrev / totPrevV) * 100) * 10) / 10 : null };
+
+      const rec = [];
+      if (lider) {
+        if (subiu(lider)) rec.push(`O ${lider.partido} subiu ${lider.delta_pct} pontos face a ${prevAno} (${lider.pct_anterior}% → ${lider.pct}%) — tendência favorável; recomenda-se consolidar a base e alargar nos distritos onde está mais fraco.`);
+        else if (desceu(lider)) rec.push(`Atenção: o ${lider.partido} caiu ${Math.abs(lider.delta_pct)} pontos vs ${prevAno} — investigar perda e reforçar a mobilização.`);
+      }
+      // alerta sobre rivais em subida
+      const rivaisSubindo = evolucao.slice(1, 4).filter(subiu);
+      for (const r of rivaisSubindo) rec.push(`Alerta: o rival ${r.partido} cresceu ${r.delta_pct} pontos vs ${prevAno} (${r.pct_anterior}% → ${r.pct}%) — a sua evolução ameaça; monitorizar de perto.`);
+      // nulos/brancos como sinal
+      const pctNB = votantes ? Math.round((nulosBrancos / votantes) * 1000) / 10 : 0;
+      const pctNBPrev = votPrev ? Math.round((nbPrev / votPrev) * 1000) / 10 : 0;
+      if (pctNB >= 3) rec.push(`Nulos e brancos somam ${pctNB}% dos votos (${nulosBrancos.toLocaleString('pt-MZ')})${pctNBPrev ? `, vs ${pctNBPrev}% no ${prevAno}` : ''} — sinal de descontentamento que pode ser convertido; vale apostar numa comunicação clara e no combate à abstenção.`);
+      else if (pctNBPrev && pctNB > pctNBPrev) rec.push(`Nulos e brancos subiram para ${pctNB}% (antes ${pctNBPrev}%) — atenção a possível protesto; rever mensagem e listas.`);
+      // abstenção
+      const abst = Math.round((100 - participacao_pct) * 10) / 10;
+      const abstPrev = tendencia.abstenção_anterior;
+      if (abstPrev != null && abst > abstPrev) rec.push(`A abstenção subiu de ${abstPrev}% para ${abst}% — há eleitores em fuga; recomenda-se campanha de mobilização porta-a-porta e foco nos indecisos.`);
+      if (!rec.length) rec.push('Sem variações relevantes face ao ciclo anterior; manter a estratégia e acompanhar os indicadores de participação.');
+      recomendacoes = { texto: rec.join(' ') };
+    } else {
+      recomendacoes = { texto: 'Não há resultados anteriores deste círculo para comparar tendências — este é o primeiro ciclo registado.' };
+    }
+  } catch (e) {
+    tendencia = null; recomendacoes = { texto: '' };
+  }
+
+  if (analise.texto && recomendacoes && recomendacoes.texto) analise.texto += ' ' + recomendacoes.texto;
+
   return {
     total_votos: total, partidos: comPct, vencedor,
     partidos_analise: partidosAnalise,
-    foco, analise,
+    foco, analise, tendencia, recomendacoes,
     filtro: { ano, tipo, provincia, distrito, posto, partido: partido || null }
   };
 }
