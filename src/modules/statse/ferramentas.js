@@ -113,8 +113,29 @@ async function resumoVotacao({ ano, tipo, provincia, distrito, posto, localidade
  * `resultados_partidos` (unidos a `eleicoes` para respeitar o filtro territorial).
  * agrupar: 'geral' (soma tudo) ou 'provincia'.
  */
-async function resultados({ ano, tipo, provincia, distrito, posto, localidade, agrupar, partido } = {}) {
+async function resultados({ ano, tipo, provincia, distrito, posto, localidade, agrupar, partido, consulta } = {}) {
   if (ano === undefined || ano === null || ano === '') ano = await anoMaisRecente();
+
+  // Extrai partido/ano da pergunta quando o modelo (ou fallback) não os tiver
+  // separado. Os nomes vêm da própria BD (nunca hardcoded).
+  if (!partido && consulta && String(consulta).trim()) {
+    const escRE = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const lowerQ = String(consulta).toLowerCase();
+    if (!ano) {
+      const ym = String(consulta).match(/\b(19|20)\d{2}\b/);
+      if (ym) ano = ym[0];
+    }
+    const conhecidos = await sql(`SELECT DISTINCT UPPER(nome_partido) AS p FROM resultados_partidos`);
+    let melhor = null, melhorLen = 0;
+    for (const row of conhecidos) {
+      const p = String(row.p).trim();
+      const re = new RegExp('(^|[^a-z0-9])' + escRE(p.toLowerCase()) + '($|[^a-z0-9])');
+      if (p.length >= 2 && re.test(lowerQ)) {
+        if (p.length > melhorLen) { melhor = row.p; melhorLen = p.length; }
+      }
+    }
+    if (melhor) partido = melhor;
+  }
 
   const partidoNorm = partido && String(partido).trim() ? norm(partido) : null;
   const matchPartido = (nome) => {
