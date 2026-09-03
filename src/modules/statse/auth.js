@@ -8,10 +8,10 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 import { scryptSync, pbkdf2Sync, createHash, timingSafeEqual } from 'node:crypto';
-import { neon } from '@neondatabase/serverless';
 import { assinarToken } from '../../auth/index.js';
+import { sqlStatse } from './db.js';
 
-const sql = neon(process.env.STATSE_DATABASE_URL);
+const sql = (...args) => sqlStatse()(...args);
 
 function compararHex(a, b) {
   const ha = Buffer.from(a, 'hex');

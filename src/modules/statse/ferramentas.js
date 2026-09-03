@@ -6,10 +6,11 @@
  *  Os valores numéricos são decifrados em runtime com crypto.js.
  * ═══════════════════════════════════════════════════════════════════
  */
-import { neon } from '@neondatabase/serverless';
 import { decifrarInt, decifrar } from './crypto.js';
+import { sqlStatse } from './db.js';
 
-const sql = neon(process.env.STATSE_DATABASE_URL);
+// Execução preguiçosa: resolve o cliente Neon apenas no momento da query.
+const sql = (...args) => sqlStatse()(...args);
 
 // Normaliza um texto para comparação (maiúsculas, sem acentos, sem pontuação)
 function norm(texto) {
