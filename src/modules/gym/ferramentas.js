@@ -216,7 +216,7 @@ async function caixa(gymId) {
   `, [gymId]);
   const [totais] = await sql(`
     SELECT count(*)::int AS sessoes,
-           count(*) FILTER (WHERE status = 'aberto')::int AS abertas
+           count(*) FILTER (WHERE status IN ('aberto','pendente_validacao'))::int AS abertas
     FROM caixa_sessions
     WHERE ($1::text IS NULL OR gym_id::text = $1)
   `, [gymId]);
@@ -277,7 +277,7 @@ async function relatorioInsight(gymId) {
 }
 
 export const FERRAMENTAS_GYM = {
-  buscar_produtos: (p = {}) => buscarProdutos(p.termos, p.isSuperAdmin ? null : gymDe(p)),
+  buscar_produtos: (p = {}) => buscarProdutos(p.termos ?? p.consulta, p.isSuperAdmin ? null : gymDe(p)),
   vendas: (p = {}) => resumoVendas(p.periodo ?? 'total', p.isSuperAdmin ? null : gymDe(p), p.consulta),
   top_produtos: (p = {}) => topProdutos(p.isSuperAdmin ? null : gymDe(p)),
   estoque_baixo: (p = {}) => estoqueBaixo(p.isSuperAdmin ? null : gymDe(p)),
