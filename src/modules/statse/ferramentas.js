@@ -147,14 +147,14 @@ async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, part
       const todos = [...mp.entries()].map(([p, votos]) => ({ partido: p, votos })).sort((a, b) => b.votos - a.votos);
       const totalProv = todos.reduce((s, x) => s + x.votos, 0);
       if (todos.length) vencedorPorProvincia.push({ provincia: nome, partido: todos[0].partido, votos: todos[0].votos });
-      const selecao = todos.filter(x => matchPartido(x.partido));
-      for (const x of selecao) por_provincia.push({ provincia: nome, partido: x.partido, votos: x.votos, pct: totalProv ? Math.round((x.votos / totalProv) * 1000) / 10 : 0 });
+      // mostra todos os partidos (adversários) por província
+      for (const x of todos) por_provincia.push({ provincia: nome, partido: x.partido, votos: x.votos, pct: totalProv ? Math.round((x.votos / totalProv) * 1000) / 10 : 0 });
     }
 
     const vencedorGeral = [...porProv.values()]
       .flatMap(m => [...m.entries()].map(([p, v]) => ({ partido: p, votos: v })))
       .reduce((acc, x) => { acc[x.partido] = (acc[x.partido] || 0) + x.votos; return acc; }, {});
-    const venc = Object.entries(vencedorGeral).map(([p, v]) => ({ partido: p, votos: v })).filter(x => matchPartido(x.partido)).sort((a, b) => b.votos - a.votos)[0] || null;
+    const venc = Object.entries(vencedorGeral).map(([p, v]) => ({ partido: p, votos: v })).sort((a, b) => b.votos - a.votos)[0] || null;
 
     return {
       agrupado_por: 'provincia', total_votos: venc ? venc.votos : 0, vencedor: venc,
@@ -174,7 +174,7 @@ async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, part
 
   const mapa = new Map();
   for (const l of linhas) {
-    if (!matchPartido(l.partido)) continue;
+    // mostra todos os partidos (adversários no mesmo local), sem filtrar por partido
     mapa.set(l.partido, (mapa.get(l.partido) || 0) + decifrarInt(l.voto));
   }
   const lista = [...mapa.entries()]
@@ -184,7 +184,46 @@ async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, part
   const total = lista.reduce((s, x) => s + x.votos, 0);
   const comPct = lista.map(x => ({ ...x, pct: total ? Math.round((x.votos / total) * 1000) / 10 : 0 }));
   const vencedor = comPct.length ? { partido: comPct[0].partido, votos: comPct[0].votos, pct: comPct[0].pct } : null;
-  return { total_votos: total, partidos: comPct, vencedor, filtro: { ano, tipo, provincia, distrito, posto, partido: partido || null } };
+
+  // ── Análise (replicada das fórmulas do eleicoes_app) ──────────────
+  // percentual de votos válidos e percentual sobre os inscritos por partido + participação
+  const { where: whereE, params: paramsE } = construirFiltro({ ano, tipo, provincia, distrito, posto }, false);
+  const totRows = await sql(`
+    SELECT eleitores_inscritos AS ins, total_votantes AS vot, votos_validos AS val
+    FROM eleicoes e ${whereE}
+  `, paramsE);
+  let inscritos = 0, votantes = 0;
+  for (const t of totRows) { inscritos += decifrarInt(t.ins); votantes += decifrarInt(t.vot); }
+
+  const partidosAnalise = comPct.map(x => ({
+    partido: x.partido, votos: x.votos,
+    percentual_validos: x.pct,
+    percentual_inscritos: inscritos ? Math.round((x.votos / inscritos) * 1000) / 10 : 0
+  }));
+
+  const participantes = partidosAnalise;
+  const vencAnalise = participantes[0] || null;
+  const segundo = participantes[1] || null;
+  const participacao_pct = inscritos ? Math.round((votantes / inscritos) * 1000) / 10 : 0;
+
+  const escopo = provincia ? ('província de ' + String(provincia).trim().toLowerCase()) : (distrito ? ('distrito de ' + String(distrito).trim().toLowerCase()) : 'a nível nacional');
+  const trechos = [];
+  if (vencAnalise) {
+    trechos.push(`O ${vencAnalise.partido} lidera em ${escopo} no ano ${ano} com ${vencAnalise.votos.toLocaleString('pt-MZ')} votos (${vencAnalise.percentual_validos}% dos votos válidos; ${vencAnalise.percentual_inscritos}% dos inscritos).`);
+    if (segundo) {
+      const margem = vencAnalise.votos - segundo.votos;
+      trechos.push(`Vantagem de ${margem.toLocaleString('pt-MZ')} votos sobre o ${segundo.partido} (${segundo.percentual_validos}%).`);
+    }
+  }
+  if (inscritos) trechos.push(`Participação de ${participacao_pct}% (${votantes.toLocaleString('pt-MZ')} votaram de ${inscritos.toLocaleString('pt-MZ')} inscritos; abstenção de ${(100 - participacao_pct).toFixed(1)}%).`);
+  const analise = { texto: trechos.join(' '), inscritos, votantes, participacao_pct };
+
+  return {
+    total_votos: total, partidos: comPct, vencedor,
+    partidos_analise: partidosAnalise,
+    analise,
+    filtro: { ano, tipo, provincia, distrito, posto, partido: partido || null }
+  };
 }
 
 /**

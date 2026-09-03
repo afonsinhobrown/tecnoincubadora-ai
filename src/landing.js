@@ -775,6 +775,13 @@ function renderDados(container, dados) {
       txt += '</span></div>';
       container.innerHTML += txt;
     }
+    // análise inteligente (texto) associada aos resultados
+    if (dados.analise && dados.analise.texto) {
+      const p = document.createElement('p');
+      p.style.cssText = 'margin:10px 0;font-size:.88rem;line-height:1.5;background:var(--azul-claro);color:var(--azul);border-radius:8px;padding:10px 12px;';
+      p.textContent = '🧠 ' + String(dados.analise.texto);
+      container.appendChild(p);
+    }
     // qualquer array de topo vira tabela (ex: partidos, provincias, por_provincia, lista)
     for (const chave of Object.keys(dados)) {
       const arr = dados[chave];
