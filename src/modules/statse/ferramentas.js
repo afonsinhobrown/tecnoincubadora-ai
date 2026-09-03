@@ -215,13 +215,23 @@ async function resultados({ ano, tipo, provincia, distrito, posto, agrupar, part
       trechos.push(`Vantagem de ${margem.toLocaleString('pt-MZ')} votos sobre o ${segundo.partido} (${segundo.percentual_validos}%).`);
     }
   }
+  // nota sobre o partido que o utilizador indicou (foco), se não for o líder
+  const foco = partidoNorm || null;
+  if (foco && vencAnalise && !matchPartido(vencAnalise.partido)) {
+    const idx = partidosAnalise.findIndex(p => matchPartido(p.partido));
+    if (idx >= 0) {
+      const p = partidosAnalise[idx];
+      const ord = ['1º', '2º', '3º', '4º', '5º'][idx] || ((idx + 1) + 'º');
+      trechos.push(`O ${p.partido} que indicaste ficou em ${ord} lugar com ${p.votos.toLocaleString('pt-MZ')} votos (${p.percentual_validos}% dos votos válidos).`);
+    }
+  }
   if (inscritos) trechos.push(`Participação de ${participacao_pct}% (${votantes.toLocaleString('pt-MZ')} votaram de ${inscritos.toLocaleString('pt-MZ')} inscritos; abstenção de ${(100 - participacao_pct).toFixed(1)}%).`);
   const analise = { texto: trechos.join(' '), inscritos, votantes, participacao_pct };
 
   return {
     total_votos: total, partidos: comPct, vencedor,
     partidos_analise: partidosAnalise,
-    analise,
+    foco, analise,
     filtro: { ano, tipo, provincia, distrito, posto, partido: partido || null }
   };
 }

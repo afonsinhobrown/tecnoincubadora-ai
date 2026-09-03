@@ -706,10 +706,12 @@ function corPartido(nome) {
 }
 
 // Gráfico de barras horizontal: adversários no mesmo gráfico, cada um com cor própria
-function renderPartidosChart(container, lista) {
+function renderPartidosChart(container, lista, foco) {
   if (!Array.isArray(lista) || !lista.length) return;
   let max = 1;
   lista.forEach(x => { const v = Number(x.votos) || 0; if (v > max) max = v; });
+  const fn = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const focoN = fn(foco);
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin:12px 0;';
   const tit = document.createElement('div');
@@ -720,18 +722,19 @@ function renderPartidosChart(container, lista) {
     const votos = Number(x.votos) || 0;
     const pct = (x.pct != null) ? x.pct : Math.round((votos / max) * 1000) / 10;
     const w = Math.max(3, Math.round((votos / max) * 100));
+    const ehFoco = focoN && fn(x.partido) === focoN;
     const linha = document.createElement('div');
     linha.style.cssText = 'display:flex;align-items:center;margin:4px 0;gap:6px;';
     const lbl = document.createElement('div');
-    lbl.style.cssText = 'width:96px;font-size:.78rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cinza);';
-    lbl.textContent = x.partido;
+    lbl.style.cssText = 'width:96px;font-size:.78rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cinza);font-weight:' + (ehFoco ? '700' : 'normal') + ';';
+    lbl.textContent = (ehFoco ? '▶ ' : '') + x.partido;
     const trilho = document.createElement('div');
-    trilho.style.cssText = 'flex:1;background:var(--borda);border-radius:6px;height:20px;overflow:hidden;';
+    trilho.style.cssText = 'flex:1;background:var(--borda);border-radius:6px;height:20px;overflow:hidden;box-shadow:' + (ehFoco ? '0 0 0 2px #111827' : 'none') + ';';
     const barra = document.createElement('div');
     barra.style.cssText = 'height:100%;width:' + w + '%;background:' + corPartido(x.partido) + ';';
     trilho.appendChild(barra);
     const val = document.createElement('div');
-    val.style.cssText = 'width:150px;font-size:.78rem;white-space:nowrap;color:var(--cinza);';
+    val.style.cssText = 'width:150px;font-size:.78rem;white-space:nowrap;color:' + (ehFoco ? 'var(--azul)' : 'var(--cinza)') + ';font-weight:' + (ehFoco ? '700' : 'normal') + ';';
     val.textContent = Number(votos).toLocaleString('pt-MZ') + ' votos (' + pct + '%)';
     linha.append(lbl, trilho, val);
     wrap.appendChild(linha);
@@ -763,8 +766,8 @@ function renderDados(container, dados) {
       const entradas = Object.entries(dados).filter(([, v]) => v != null && typeof v !== 'object' && !Array.isArray(v));
       if (entradas.length) container.innerHTML = '<div class="kpi-grid">' + kpiHtml(entradas) + '</div>';
     }
-    // gráfico colorido por partido (adversários no mesmo gráfico)
-    if (Array.isArray(dados.partidos) && dados.partidos.length) renderPartidosChart(container, dados.partidos);
+    // gráfico colorido por partido (adversários no mesmo gráfico), destacando o foco
+    if (Array.isArray(dados.partidos) && dados.partidos.length) renderPartidosChart(container, dados.partidos, dados.foco);
     // realça um eventual vencedor (ex: resultados eleitorais)
     if (dados.vencedor && typeof dados.vencedor === 'object') {
       const v = dados.vencedor;
