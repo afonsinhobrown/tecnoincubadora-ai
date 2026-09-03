@@ -173,7 +173,7 @@
     <div class="busca-box">
       <label for="q">Pergunta em linguagem normal</label>
       <div class="linha">
-        <input id="q" placeholder="Ex: quantas vendas tive hoje?">
+        <input id="q" placeholder="Escreve a tua pergunta…">
         <button id="btn" onclick="perguntar()">Perguntar</button>
       </div>
       <div class="exemplos" id="exemplos"></div>
@@ -204,8 +204,7 @@ let SISTEMA_ATUAL = null;      // sistema selecionado
 let ULTIMA_RESPOSTA = null;    // última resposta { blocos, produtos, sistema } p/ exportação
 let SESSAO = null;             // { usuario, farmacia } do login
 const EXEMPLOS_PADRAO = [
-  'quantas vendas tive hoje?', 'faturação do mês', 'produtos mais vendidos',
-  'o que tenho que repor no estoque?', 'pedidos pendentes', 'amoxilina'
+  'olá, o que podes fazer?', 'mostra as tuas capacidades', 'ajuda', 'o que posso perguntar?'
 ];
 const elLanding = document.getElementById('view-landing');
 const elLogin = document.getElementById('view-login');
@@ -408,9 +407,17 @@ async function baixarPDF() {
 function arraysDaResposta() {
   const arr = [];
   (ULTIMA_RESPOSTA?.blocos || []).forEach(b => {
-    if (Array.isArray(b.dados)) arr.push({ titulo: b.titulo, linhas: b.dados });
-    else if (b.dados && Array.isArray(b.dados.lista)) arr.push({ titulo: b.titulo + ' (lista)', linhas: b.dados.lista });
-    else if (b.dados && Array.isArray(b.dados.por_forma_pagamento)) arr.push({ titulo: b.titulo + ' (por forma)', linhas: b.dados.por_forma_pagamento });
+    const d = b.dados;
+    if (Array.isArray(d)) { if (d.length && typeof d[0] === 'object') arr.push({ titulo: b.titulo, linhas: d }); }
+    else if (d && typeof d === 'object') {
+      if (Array.isArray(d.lista)) arr.push({ titulo: b.titulo + ' (lista)', linhas: d.lista });
+      if (Array.isArray(d.por_forma_pagamento)) arr.push({ titulo: b.titulo + ' (por forma)', linhas: d.por_forma_pagamento });
+      for (const chave of Object.keys(d)) {
+        if (['lista', 'por_forma_pagamento'].includes(chave)) continue;
+        const v = d[chave];
+        if (Array.isArray(v) && v.length && typeof v[0] === 'object') arr.push({ titulo: b.titulo + ' (' + chave.replace(/_/g, ' ') + ')', linhas: v });
+      }
+    }
   });
   return arr;
 }
@@ -631,8 +638,15 @@ function textoDoBloco(b) {
   if (Array.isArray(d)) { d.slice(0, 30).forEach(r => linhas.push('- ' + Object.values(r).map(ser).join(' | '))); }
   else if (d && typeof d === 'object') {
     if (d.totais && typeof d.totais === 'object') Object.entries(d.totais).filter(([,v])=>typeof v!=='object').forEach(([k,v])=>linhas.push('• '+k.replace(/_/g,' ')+': '+v));
+    if (d.vencedor && typeof d.vencedor === 'object') linhas.push('🏆 Vencedor: '+ (d.vencedor.partido||'') + (d.vencedor.votos? ' — '+Number(d.vencedor.votos).toLocaleString('pt-MZ')+' votos':'') + (d.vencedor.pct? ' ('+d.vencedor.pct+'%)':''));
     const lista = d.lista || d.por_forma_pagamento;
     if (Array.isArray(lista)) lista.slice(0,30).forEach(r => linhas.push('- '+Object.values(r).map(ser).join(' | ')));
+    for (const chave of Object.keys(d)) {
+      if (['lista','por_forma_pagamento'].includes(chave)) continue;
+      const arr = d[chave];
+      if (Array.isArray(arr) && arr.length && typeof arr[0]==='object')
+        arr.slice(0,30).forEach(r => linhas.push('- '+Object.values(r).map(ser).join(' | ')));
+    }
   } else if (b.texto) linhas.push(b.texto);
   return linhas.join('\n');
 }
@@ -690,27 +704,43 @@ function renderDados(container, dados) {
     return;
   }
   if (dados && typeof dados === 'object') {
-    // formato { totais: {...}, lista: [...] } -> KPIs + tabela da lista
+    const kpiHtml = (entradas) => entradas.map(function (par) {
+      const k = par[0], v = par[1];
+      return '<div class="kpi"><div class="valor">' + esc(String(v)) + '</div><div class="rotulo">' + esc(cap(String(k).replace(/_/g, ' '))) + '</div></div>';
+    }).join('');
     if (dados.totais && typeof dados.totais === 'object') {
-      const t = dados.totais;
-      const entradas = Object.entries(t).filter(([, v]) => v != null && typeof v !== 'object');
-      if (entradas.length) {
-        container.innerHTML = '<div class="kpi-grid">' + entradas.map(([k, v]) =>
-          `<div class="kpi"><div class="valor">${esc(String(v))}</div><div class="rotulo">${esc(cap(String(k).replace(/_/g, ' ')))}</div></div>`
-        ).join('') + '</div>';
-      }
+      const entradas = Object.entries(dados.totais).filter(([, v]) => v != null && typeof v !== 'object');
+      if (entradas.length) container.innerHTML = '<div class="kpi-grid">' + kpiHtml(entradas) + '</div>';
       if (Array.isArray(dados.lista) && dados.lista.length) {
         const chaves = Object.keys(dados.lista[0]).filter(k => k !== 'id');
         renderTabela(container, dados.lista, chaves.map(c => cap(String(c).replace(/_/g, ' '))),
           r => chaves.map(c => esc(String(r[c] ?? ''))));
       }
-      return;
+    } else {
+      const entradas = Object.entries(dados).filter(([, v]) => v != null && typeof v !== 'object' && !Array.isArray(v));
+      if (entradas.length) container.innerHTML = '<div class="kpi-grid">' + kpiHtml(entradas) + '</div>';
     }
-    const entradas = Object.entries(dados).filter(([, v]) => v != null && typeof v !== 'object');
-    if (entradas.length) {
-      container.innerHTML = '<div class="kpi-grid">' + entradas.map(([k, v]) =>
-        `<div class="kpi"><div class="valor">${esc(String(v))}</div><div class="rotulo">${esc(cap(String(k).replace(/_/g, ' ')))}</div></div>`
-      ).join('') + '</div>';
+    // realça um eventual vencedor (ex: resultados eleitorais)
+    if (dados.vencedor && typeof dados.vencedor === 'object') {
+      const v = dados.vencedor;
+      let txt = '<div style="margin:10px 0"><span style="font-size:.9rem">🏆 Vencedor: <b>' + esc(String(v.partido ?? v.nome ?? '')) + '</b>';
+      if (v.votos) txt += ' — ' + Number(v.votos).toLocaleString('pt-MZ') + ' votos';
+      if (v.pct) txt += ' (' + v.pct + '%)';
+      txt += '</span></div>';
+      container.innerHTML += txt;
+    }
+    // qualquer array de topo vira tabela (ex: partidos, provincias, por_provincia, lista)
+    for (const chave of Object.keys(dados)) {
+      const arr = dados[chave];
+      if (Array.isArray(arr) && arr.length && typeof arr[0] === 'object') {
+        const chaves = Object.keys(arr[0]).filter(k => k !== 'id');
+        const h = document.createElement('div');
+        h.style.cssText = 'font-size:.85rem;font-weight:600;margin:10px 0 4px;';
+        h.textContent = cap(String(chave).replace(/_/g, ' '));
+        container.appendChild(h);
+        renderTabela(container, arr, chaves.map(c => cap(String(c).replace(/_/g, ' '))),
+          r => chaves.map(c => esc(String(r[c] ?? ''))));
+      }
     }
   }
 }
