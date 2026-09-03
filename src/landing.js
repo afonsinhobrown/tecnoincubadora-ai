@@ -697,6 +697,49 @@ function adicionarDetalhes(titulo) {
   if (extra && extra.trim()) { elQ.value = titulo + ' — ' + extra.trim(); perguntar(); }
 }
 
+// Cor estável por partido (mesma cor para o mesmo partido em qualquer resposta)
+function corPartido(nome) {
+  const pal = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#9333ea', '#ea580c', '#0d9488', '#ca8a04'];
+  let h = 0;
+  const n = String(nome || '');
+  for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
+  return pal[h % pal.length];
+}
+
+// Gráfico de barras horizontal: adversários no mesmo gráfico, cada um com cor própria
+function renderPartidosChart(container, lista) {
+  if (!Array.isArray(lista) || !lista.length) return;
+  let max = 1;
+  lista.forEach(x => { const v = Number(x.votos) || 0; if (v > max) max = v; });
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin:12px 0;';
+  const tit = document.createElement('div');
+  tit.style.cssText = 'font-size:.85rem;font-weight:600;margin-bottom:8px;color:var(--azul);';
+  tit.textContent = '📊 Resultado por partido';
+  wrap.appendChild(tit);
+  lista.forEach(x => {
+    const votos = Number(x.votos) || 0;
+    const pct = (x.pct != null) ? x.pct : Math.round((votos / max) * 1000) / 10;
+    const w = Math.max(3, Math.round((votos / max) * 100));
+    const linha = document.createElement('div');
+    linha.style.cssText = 'display:flex;align-items:center;margin:4px 0;gap:6px;';
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'width:96px;font-size:.78rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cinza);';
+    lbl.textContent = x.partido;
+    const trilho = document.createElement('div');
+    trilho.style.cssText = 'flex:1;background:var(--borda);border-radius:6px;height:20px;overflow:hidden;';
+    const barra = document.createElement('div');
+    barra.style.cssText = 'height:100%;width:' + w + '%;background:' + corPartido(x.partido) + ';';
+    trilho.appendChild(barra);
+    const val = document.createElement('div');
+    val.style.cssText = 'width:150px;font-size:.78rem;white-space:nowrap;color:var(--cinza);';
+    val.textContent = Number(votos).toLocaleString('pt-MZ') + ' votos (' + pct + '%)';
+    linha.append(lbl, trilho, val);
+    wrap.appendChild(linha);
+  });
+  container.appendChild(wrap);
+}
+
 function renderDados(container, dados) {
   if (Array.isArray(dados) && dados.length) {
     const chaves = Object.keys(dados[0]).filter(k => k !== 'id');
@@ -721,6 +764,8 @@ function renderDados(container, dados) {
       const entradas = Object.entries(dados).filter(([, v]) => v != null && typeof v !== 'object' && !Array.isArray(v));
       if (entradas.length) container.innerHTML = '<div class="kpi-grid">' + kpiHtml(entradas) + '</div>';
     }
+    // gráfico colorido por partido (adversários no mesmo gráfico)
+    if (Array.isArray(dados.partidos) && dados.partidos.length) renderPartidosChart(container, dados.partidos);
     // realça um eventual vencedor (ex: resultados eleitorais)
     if (dados.vencedor && typeof dados.vencedor === 'object') {
       const v = dados.vencedor;
