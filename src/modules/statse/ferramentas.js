@@ -21,6 +21,15 @@ function norm(texto) {
     .trim();
 }
 
+// Ano mais recente existente, com cache (para limitar o âmbito por defeito).
+let anoMax = null;
+async function anoMaisRecente() {
+  if (anoMax) return anoMax;
+  const r = await sql(`SELECT max(ano_eleicao)::int AS ano FROM eleicoes`);
+  anoMax = r[0]?.ano || 2023;
+  return anoMax;
+}
+
 /**
  * Constrói o WHERE + params a partir de filtros opcionais sobre a tabela eleicoes.
  * useAlias: prefixa as colunas com `e.` (para queries com JOIN em resultados_partidos).
@@ -76,6 +85,7 @@ async function resumoEstrutura({ ano, tipo, provincia, distrito, posto, localida
  * abstenções) num âmbito. Soma as 6 colunas cifradas de todas as mesas do âmbito.
  */
 async function resumoVotacao({ ano, tipo, provincia, distrito, posto, localidade } = {}) {
+  if (ano === undefined || ano === null || ano === '') ano = await anoMaisRecente();
   const { where, params } = construirFiltro({ ano, tipo, provincia, distrito, posto, localidade });
 
   const linhas = await sql(`
@@ -104,6 +114,7 @@ async function resumoVotacao({ ano, tipo, provincia, distrito, posto, localidade
  * agrupar: 'geral' (soma tudo) ou 'provincia'.
  */
 async function resultados({ ano, tipo, provincia, distrito, posto, agrupar } = {}) {
+  if (ano === undefined || ano === null || ano === '') ano = await anoMaisRecente();
   const { where, params } = construirFiltro({ ano, tipo, provincia, distrito, posto }, true);
 
   // traz por partido ordenado, decifra e soma no JS
@@ -166,7 +177,7 @@ async function buscar({ termo, ano } = {}) {
  * 5) Relatório insight por partido — distribuição de partidos e vencedor por província.
  */
 async function relatorioInsight({ ano } = {}) {
-  const anoAlvo = ano || 2023;
+  const anoAlvo = ano || await anoMaisRecente();
   const [resumo] = await sql(`
     SELECT count(*)::int mesas,
            count(DISTINCT upper(provincia))::int provincias
