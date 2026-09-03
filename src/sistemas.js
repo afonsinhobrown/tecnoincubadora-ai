@@ -36,7 +36,7 @@ export const SISTEMAS = [
   { slug: 'wms',           nome: 'Smart Warehouse WMS', emoji: '📦', desc: 'Sistema de armazém (standalone)',                             implementado: true, apiPath: '/api/armazem',
     exemplos: ['quantas encomendas hoje', 'faturação do mês', 'produtos mais movimentados', 'produtos a repor'] },
   { slug: 'statse',        nome: 'StatsE',            emoji: '📊', desc: 'Análise e consulta de processos eleitorais',                    implementado: true, apiPath: '/api/statse',
-    exemplos: ['quantas mesas de voto em Gaza', 'resultados por partido em Maputo', 'quem ganhou em 2023', 'quantos eleitores inscritos em Nampula'] }
+    exemplos: ['quantas mesas de voto existem em Gaza?', 'quantos eleitores inscritos houve em Nampula?', 'quem ganhou as autárquicas de 2018 em Maputo?', 'resultados por partido em Gaza em 2023', 'procura o local de voto EP2', 'partido vencedor por província em 2023'] }
 ];
 
 export function sistemaPorSlug(slug) {

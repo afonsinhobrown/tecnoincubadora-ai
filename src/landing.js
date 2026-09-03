@@ -205,8 +205,7 @@ let SISTEMA_ATUAL = null;      // sistema selecionado
 let ULTIMA_RESPOSTA = null;    // última resposta { blocos, produtos, sistema } p/ exportação
 let SESSAO = null;             // { usuario, farmacia } do login
 const EXEMPLOS_PADRAO = [
-  'quantas vendas tive hoje?', 'faturação do mês', 'produtos mais vendidos',
-  'o que tenho que repor no estoque?', 'pedidos pendentes', 'amoxilina'
+  'olá, o que podes fazer?', 'mostra as tuas capacidades', 'ajuda', 'o que posso perguntar?'
 ];
 const elLanding = document.getElementById('view-landing');
 const elLogin = document.getElementById('view-login');
