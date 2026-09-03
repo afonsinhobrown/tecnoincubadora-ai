@@ -174,7 +174,7 @@ export const LANDING_HTML = `<!DOCTYPE html>
     <div class="busca-box">
       <label for="q">Pergunta em linguagem normal</label>
       <div class="linha">
-        <input id="q" placeholder="Ex: quantas vendas tive hoje?">
+        <input id="q" placeholder="Escreve a tua pergunta…">
         <button id="btn" onclick="perguntar()">Perguntar</button>
       </div>
       <div class="exemplos" id="exemplos"></div>
