@@ -28,6 +28,13 @@ export async function getCache({ sistemaSlug, tenantId, query }) {
 }
 
 export async function setCache({ sistemaSlug, tenantId, query, resposta }) {
+  // nunca guardar respostas vazias/zeradas (ex STATSE antes dos fixes de acentos)
+  const blocos = resposta?.blocos || [];
+  const vazio = blocos.some(b => {
+    const d = b?.dados;
+    return d && (d.total_votos === 0 || (Array.isArray(d.partidos) && d.partidos.length === 0));
+  });
+  if (vazio) return;
   await initCache();
   const norm = normalizar(query);
   await sql(`
