@@ -132,7 +132,8 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
             distrito: { type: 'STRING', description: 'Distrito.' },
             posto: { type: 'STRING', description: 'Posto administrativo.' },
             partido: { type: 'STRING', description: 'Nome de um partido (ex: "FRELIMO", "RENAMO") para destacar nas respostas. Use apenas se o utilizador nomear um partido.' },
-            agrupar: { type: 'STRING', enum: ['provincia', 'distrito', 'posto', 'localidade'], description: 'Divide os resultados por zona. Use "distrito" se o utilizador pedir "por distrito", "provincia" se pedir "por província", etc. Deixe vazio para o total geral do âmbito.' }
+            agrupar: { type: 'STRING', enum: ['provincia', 'distrito', 'posto', 'localidade'], description: 'Divide os resultados por zona. Use "distrito" se o utilizador pedir "por distrito", "provincia" se pedir "por província", etc. Deixe vazio para o total geral do âmbito.' },
+            ordem: { type: 'STRING', enum: ['votos', 'pct', 'inscritos', 'delta', 'nome'], description: 'Critério de ordenação dos partidos na resposta. "votos" = por número de votos (padrão), "pct" = por percentagem de votos válidos, "inscritos" = por % sobre inscritos, "delta" = por variação face ao processo anterior (quem mais subiu/caiu), "nome" = ordem alfabética. Use se o utilizador pedir ordenar por esse critério (ex: "por percentagem", "quem subiu mais").' }
           }
         });
       } else if (identidade.nome === 'Assistente StatsE' && nome === 'buscar') {

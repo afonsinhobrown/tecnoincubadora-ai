@@ -21,6 +21,21 @@ function norm(texto) {
     .trim();
 }
 
+// Aplica a mesma normalização à coluna na SQL (TRANSLATE), para que
+// "AUTÁRQUICA" (com acento na BD) corresponda a "AUTARQUICA" (parâmetro
+// já normalizado). Sem isto, filtros por tipo/distrito/posto/localidade
+// com acentos devolviam sempre listas vazias.
+const ACENTOS = 'ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ';
+const PLANOS = 'AAAAAEEEEIIIIOOOOUUUUCN';
+function sqlNorm(col) {
+  return `UPPER(TRANSLATE(${col}, '${ACENTOS}', '${PLANOS}'))`;
+}
+
+// Escapa carateres especiais de regex (para localizar nomes reais da BD na pergunta).
+function escRE(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Ano mais recente existente, com cache (para limitar o âmbito por defeito).
 let anoMax = null;
 async function anoMaisRecente() {
@@ -41,11 +56,11 @@ function construirFiltro({ ano, tipo, provincia, distrito, posto, localidade }, 
   const addParam = (v) => { params.push(v); return params.length; };
 
   if (ano !== undefined && ano !== null && ano !== '') { cond.push(`${p('ano_eleicao')} = $${addParam(Number(ano))}`); }
-  if (tipo && String(tipo).trim()) { cond.push(`UPPER(${p('tipo_eleicao')}) = $${addParam(norm(tipo))}`); }
-  if (provincia && String(provincia).trim()) { cond.push(`UPPER(${p('provincia')}) LIKE $${addParam(norm(provincia) + '%')}`); }
-  if (distrito && String(distrito).trim()) { cond.push(`UPPER(${p('distrito')}) = $${addParam(norm(distrito))}`); }
-  if (posto && String(posto).trim()) { cond.push(`UPPER(${p('posto_administrativo')}) = $${addParam(norm(posto))}`); }
-  if (localidade && String(localidade).trim()) { cond.push(`UPPER(${p('localidade')}) = $${addParam(norm(localidade))}`); }
+  if (tipo && String(tipo).trim()) { cond.push(`${sqlNorm(p('tipo_eleicao'))} = $${addParam(norm(tipo))}`); }
+  if (provincia && String(provincia).trim()) { cond.push(`${sqlNorm(p('provincia'))} LIKE $${addParam(norm(provincia) + '%')}`); }
+  if (distrito && String(distrito).trim()) { cond.push(`${sqlNorm(p('distrito'))} = $${addParam(norm(distrito))}`); }
+  if (posto && String(posto).trim()) { cond.push(`${sqlNorm(p('posto_administrativo'))} = $${addParam(norm(posto))}`); }
+  if (localidade && String(localidade).trim()) { cond.push(`${sqlNorm(p('localidade'))} = $${addParam(norm(localidade))}`); }
 
   return { where: cond.length ? `WHERE ${cond.join(' AND ')}` : '', params };
 }
@@ -113,29 +128,57 @@ async function resumoVotacao({ ano, tipo, provincia, distrito, posto, localidade
  * `resultados_partidos` (unidos a `eleicoes` para respeitar o filtro territorial).
  * agrupar: 'geral' (soma tudo) ou 'provincia'.
  */
-async function resultados({ ano, tipo, provincia, distrito, posto, localidade, agrupar, partido, consulta } = {}) {
-  if (ano === undefined || ano === null || ano === '') ano = await anoMaisRecente();
-
-  // Extrai partido/ano da pergunta quando o modelo (ou fallback) não os tiver
-  // separado. Os nomes vêm da própria BD (nunca hardcoded).
-  if (!partido && consulta && String(consulta).trim()) {
-    const escRE = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+async function resultados({ ano, tipo, provincia, distrito, posto, localidade, agrupar, partido, ordem, consulta } = {}) {
+  // Extrai partido/ano/agrupamento/ordem/província da pergunta quando o modelo
+  // (ou fallback) não os tiver estruturado. Os nomes vêm da própria BD.
+  if (consulta && String(consulta).trim()) {
     const lowerQ = String(consulta).toLowerCase();
+    const q = norm(consulta);
     if (!ano) {
       const ym = String(consulta).match(/\b(19|20)\d{2}\b/);
       if (ym) ano = ym[0];
     }
-    const conhecidos = await sql(`SELECT DISTINCT UPPER(nome_partido) AS p FROM resultados_partidos`);
-    let melhor = null, melhorLen = 0;
-    for (const row of conhecidos) {
-      const p = String(row.p).trim();
-      const re = new RegExp('(^|[^a-z0-9])' + escRE(p.toLowerCase()) + '($|[^a-z0-9])');
-      if (p.length >= 2 && re.test(lowerQ)) {
-        if (p.length > melhorLen) { melhor = row.p; melhorLen = p.length; }
+    if (!partido) {
+      const conhecidos = await sql(`SELECT DISTINCT UPPER(nome_partido) AS p FROM resultados_partidos`);
+      let melhor = null, melhorLen = 0;
+      for (const row of conhecidos) {
+        const p = String(row.p).trim();
+        const re = new RegExp('(^|[^a-z0-9])' + escRE(p.toLowerCase()) + '($|[^a-z0-9])', 'i');
+        if (p.length >= 2 && re.test(lowerQ)) {
+          if (p.length > melhorLen) { melhor = row.p; melhorLen = p.length; }
+        }
       }
+      if (melhor) partido = melhor;
     }
-    if (melhor) partido = melhor;
+
+    // linguagem comum do prompt: zona de agrupamento, critério de ordenação e província
+    if (!agrupar) {
+      const mZ = q.match(/\bPOR (PROVINCIA|PROVINCIAL|DISTRITO|DISTRITAL|POSTO|LOCALIDADE)\b/);
+      if (mZ) agrupar = mZ[1].toLowerCase();
+    }
+    if (!ordem) {
+      const mO = q.match(/\bPOR (PERCENTAGEM|PERCENTUAL|VOTOS|INSCRITOS|NOME|ALFABETICA|VARIACAO|TENDENCIA|DELTA)\b/);
+      if (mO) ordem = mO[1];
+      else if (/(SUBIRAM|SUBIU|SUBIDA|CRESCERA?M|CRESCEU|AUMENTARAM|GANHARA?M)/.test(q) && !/(CAIU|CAIRAM|CAIU|QUEDA|DESCERA?M|DESCEU)/.test(q)) ordem = 'delta';
+      else if (/(CAIU|CAIRAM|QUEDA|DESCERA?M|DESCEU)/.test(q)) ordem = 'delta';
+    }
+    if (!provincia && !distrito) {
+      // "Maputo" deve corresponder a "MAPUTO CIDADE" e "MAPUTO PROVÍNCIA": usa o "stem"
+      const provs = await sql(`SELECT DISTINCT UPPER(provincia) AS p FROM eleicoes`);
+      const stems = [...new Set(provs.map(r => String(r.p).trim().replace(/ (CIDADE|PROVINCIA)$/, '')))];
+      let melProv = null, melProvLen = 0;
+      for (const st of stems) {
+        if (st.length < 2) continue;
+        const re = new RegExp('(^|[^a-z0-9])' + escRE(st.toLowerCase()) + '($|[^a-z0-9])', 'i');
+        if (re.test(q)) {
+          if (st.length > melProvLen) { melProv = st; melProvLen = st.length; }
+        }
+      }
+      if (melProv) provincia = melProv;
+    }
   }
+
+  if (ano === undefined || ano === null || ano === '') ano = await anoMaisRecente();
 
   const partidoNorm = partido && String(partido).trim() ? norm(partido) : null;
   const matchPartido = (nome) => {
@@ -226,20 +269,19 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
   }
 
   const partidosAnalise = comPct.map(x => ({
-    partido: x.partido, votos: x.votos,
+    partido: x.partido, votos: x.votos, pct: x.pct,
     percentual_validos: x.pct,
     percentual_inscritos: inscritos ? Math.round((x.votos / inscritos) * 1000) / 10 : 0
   }));
 
-  const participantes = partidosAnalise;
-  const vencAnalise = participantes[0] || null;
-  const segundo = participantes[1] || null;
   const participacao_pct = inscritos ? Math.round((votantes / inscritos) * 1000) / 10 : 0;
 
   const foco = partidoNorm || null;
   const escopo = provincia ? ('província de ' + String(provincia).trim().toLowerCase()) : (distrito ? ('distrito de ' + String(distrito).trim().toLowerCase()) : 'a nível nacional');
   const idxFoco = foco ? partidosAnalise.findIndex(p => matchPartido(p.partido)) : -1;
   const focoRow = idxFoco >= 0 ? partidosAnalise[idxFoco] : null;
+  const vencAnalise = partidosAnalise[0] || null;
+  const segundo = partidosAnalise[1] || null;
   const ordFoco = idxFoco >= 0 ? (['1º', '2º', '3º', '4º', '5º'][idxFoco] || ((idxFoco + 1) + 'º')) : null;
 
   const trechos = [];
@@ -265,16 +307,17 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
   }
   if (foco && !focoRow) trechos.push(`O partido ${String(partido)} não tem resultados registados neste círculo/ano; segue a distribuição real dos partidos com votos.`);
   if (inscritos) trechos.push(`Participação de ${participacao_pct}% (${votantes.toLocaleString('pt-MZ')} votaram de ${inscritos.toLocaleString('pt-MZ')} inscritos; abstenção de ${(100 - participacao_pct).toFixed(1)}%).`);
-  const analise = { texto: trechos.join(' '), inscritos, votantes, participacao_pct };
 
   // ── Tendência vs ano anterior + recomendações ─────────────────────
+  const evolucaoCompleta = [];
+  let prevAno = null;
   let tendencia = null, recomendacoes = null;
   try {
     // ano anterior existente no mesmo círculo
     const { where: whereC, params: paramsC } = construirFiltro({ tipo, provincia, distrito, posto }, false);
     const anosDisponiveis = await sql(`SELECT DISTINCT ano_eleicao::int AS a FROM eleicoes e ${whereC} ORDER BY a`, paramsC);
     const anos = anosDisponiveis.map(x => x.a);
-    const prevAno = anos.filter(a => a < Number(ano)).sort((x, y) => y - x)[0];
+    prevAno = anos.filter(a => a < Number(ano)).sort((x, y) => y - x)[0];
 
     if (prevAno !== undefined) {
       // stats do ano anterior (partidos com join + totais na tabela simples)
@@ -296,16 +339,20 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
       const nbPrev = totPrevSimples.reduce((s, t) => s + decifrarInt(t.nul) + decifrarInt(t.bran), 0);
       const somaValPrev = partPrev.reduce((s, x) => s + x.votos, 0) || 1;
 
-      const evolucao = partidosAnalise.slice(0, 5).map(p => {
+      // tendência de subida/queda face ao processo anterior, para TODOS os partidos
+      const evolucao = partidosAnalise.map(p => {
         const ant = partPrev.find(x => norm(x.partido) === norm(p.partido));
         const votosPrev = ant ? ant.votos : 0;
         const pctPrev = ant && somaValPrev ? Math.round((ant.votos / somaValPrev) * 1000) / 10 : 0;
         const deltaPct = Math.round((p.percentual_validos - pctPrev) * 10) / 10;
         return { partido: p.partido, ano, votos: p.votos, pct: p.percentual_validos, votos_anterior: votosPrev, pct_anterior: pctPrev, delta_pct: deltaPct, delta_votos: p.votos - votosPrev };
       });
+      evolucaoCompleta.push(...evolucao);
+
       const subiu = (e) => e.delta_pct > 0.4;
       const desceu = (e) => e.delta_pct < -0.4;
-      const lider = evolucao[0];
+      const top5 = evolucao.slice(0, 5);
+      const lider = top5[0];
       tendencia = { ano_actual: Number(ano), ano_anterior: prevAno, evolucao, nulos_brancos: nulosBrancos, nulos_brancos_anterior: nbPrev, abstenção_actual: Math.round((100 - participacao_pct) * 10) / 10, abstenção_anterior: totPrevV ? Math.round((100 - (votPrev / totPrevV) * 100) * 10) / 10 : null };
 
       const rec = [];
@@ -338,18 +385,84 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
       if (!rec.length) rec.push('Sem variações relevantes face ao ciclo anterior; manter a estratégia e acompanhar os indicadores de participação.');
       recomendacoes = { texto: rec.join(' ') };
     } else {
-      recomendacoes = { texto: 'Não há resultados anteriores deste círculo para comparar tendências — este é o primeiro ciclo registado.' };
+      // Sem ciclo anterior: ainda assim destaca nulos/brancos e abstenção do próprio ano
+      const rec2 = [];
+      const pctNB2 = votantes ? Math.round((nulosBrancos / votantes) * 1000) / 10 : 0;
+      if (pctNB2 >= 3) rec2.push(`Nulos e brancos somam ${pctNB2}% dos votos (${nulosBrancos.toLocaleString('pt-MZ')}) — sinal de descontentamento que pode ser convertido; vale apostar numa comunicação clara e no combate à abstenção.`);
+      const abst2 = Math.round((100 - participacao_pct) * 10) / 10;
+      if (abst2 >= 30) rec2.push(`A abstenção é alta (${abst2}%) — há eleitores por mobilizar; recomenda-se campanha porta-a-porta e foco nos indecisos.`);
+      if (!rec2.length) rec2.push('Não há resultados anteriores deste círculo para comparar tendências — este é o primeiro ciclo registado.');
+      recomendacoes = { texto: rec2.join(' ') };
     }
   } catch (e) {
     tendencia = null; recomendacoes = { texto: '' };
   }
 
+  // funde a tendência (delta face ao ano anterior) em cada partido
+  const evolMap = new Map(evolucaoCompleta.map(e => [norm(e.partido), e]));
+  for (const p of partidosAnalise) {
+    const e = evolMap.get(norm(p.partido));
+    if (e) {
+      p.pct_anterior = e.pct_anterior;
+      p.votos_anterior = e.votos_anterior;
+      p.delta_pct = e.delta_pct;
+      p.delta_votos = e.delta_votos;
+    }
+  }
+
+  // critério de ordenação pedido em linguagem comum ("por percentagem", "quem subiu mais", ...)
+  const ORDEM_MAP = { VOTOS: 'votos', PERCENTAGEM: 'pct', PERCENTUAL: 'pct', PCT: 'pct', VALIDOS: 'pct', INSCRITOS: 'inscritos', VARIACAO: 'delta', TENDENCIA: 'delta', DELTA: 'delta', NOME: 'nome', ALFABETICA: 'nome' };
+  const ORDEM_LABEL = { votos: 'número de votos', pct: 'percentagem de votos válidos', inscritos: 'percentagem sobre os inscritos', delta: 'variação face ao processo anterior', nome: 'nome do partido' };
+  const ordemFinal = ORDEM_MAP[norm(String(ordem || ''))] || 'votos';
+  const sortBy = {
+    votos: (a, b) => (b.votos - a.votos) || ((a.percentual_inscritos || 0) - (b.percentual_inscritos || 0)),
+    pct: (a, b) => ((b.percentual_validos || 0) - (a.percentual_validos || 0)) || (b.votos - a.votos),
+    inscritos: (a, b) => ((b.percentual_inscritos || 0) - (a.percentual_inscritos || 0)) || (b.votos - a.votos),
+    delta: (a, b) => ((b.delta_pct ?? -Infinity) - (a.delta_pct ?? -Infinity)) || (b.votos - a.votos),
+    nome: (a, b) => String(a.partido).localeCompare(String(b.partido))
+  }[ordemFinal];
+  const partidosExibidos = [...partidosAnalise].sort(sortBy);
+
+  // rivais mais próximos do partido pedido (ou do vencedor)
+  const baseRival = focoRow || vencAnalise;
+  let rivais_proximos = [];
+  if (baseRival && partidosAnalise.length > 1) {
+    rivais_proximos = partidosAnalise
+      .filter(p => norm(p.partido) !== norm(baseRival.partido))
+      .map(p => ({
+        partido: p.partido, pct: p.percentual_validos, votos: p.votos,
+        diferenca_votos: Math.abs(baseRival.votos - p.votos),
+        delta_pct: p.delta_pct ?? null,
+        sentido: p.votos > baseRival.votos ? 'acima' : 'abaixo'
+      }))
+      .sort((a, b) => a.diferenca_votos - b.diferenca_votos)
+      .slice(0, 3);
+  }
+
+  // cabeçalho de tendência do partido pedido + referência aos rivais mais próximos
+  if (prevAno != null && focoRow) {
+    const ev = evolMap.get(norm(focoRow.partido));
+    if (ev) {
+      if (ev.delta_pct > 0.4) trechos.push(`Tendência face a ${prevAno}: subiu ${ev.delta_pct} pontos (${ev.pct_anterior}% → ${ev.pct}%).`);
+      else if (ev.delta_pct < -0.4) trechos.push(`Tendência face a ${prevAno}: caiu ${Math.abs(ev.delta_pct)} pontos (${ev.pct_anterior}% → ${ev.pct}%).`);
+      else if (ev.pct_anterior != null) trechos.push(`Tendência face a ${prevAno}: estável (${ev.pct}% nos dois ciclos).`);
+    }
+  }
+  if (rivais_proximos.length) {
+    const nomes = rivais_proximos.map(r =>
+      `${r.partido} a ${r.diferenca_votos.toLocaleString('pt-MZ')} votos ${r.sentido === 'acima' ? (`à frente (${r.pct}%)`) : 'abaixo'}${r.delta_pct != null ? ` (${r.delta_pct >= 0 ? '+' : ''}${r.delta_pct} pts vs ${prevAno ?? 'anterior'})` : ''}`).join(', ');
+    trechos.push(`Rivais mais próximos de ${baseRival.partido}: ${nomes}.`);
+  }
+  if (ordemFinal !== 'votos') trechos.push(`Lista ordenada por ${ORDEM_LABEL[ordemFinal]}.`);
+
+  const analise = { texto: trechos.join(' '), inscritos, votantes, participacao_pct };
   if (analise.texto && recomendacoes && recomendacoes.texto) analise.texto += ' ' + recomendacoes.texto;
 
   return {
-    total_votos: total, partidos: comPct, vencedor,
+    total_votos: total, partidos: partidosExibidos, vencedor,
     partidos_analise: partidosAnalise,
-    foco, analise, tendencia, recomendacoes,
+    foco, analise, tendencia, recomendacoes, rivais_proximos,
+    ordem: ordemFinal !== 'votos' ? ordemFinal : null,
     filtro: { ano, tipo, provincia, distrito, posto, partido: partido || null }
   };
 }
@@ -369,9 +482,9 @@ async function buscar({ termo, ano } = {}) {
            UPPER(posto_administrativo) AS posto, UPPER(localidade) AS localidade,
            local_voto, codigo_assembleia
     FROM eleicoes
-    WHERE UPPER(coalesce(local_voto,'')) LIKE $1 OR UPPER(coalesce(localidade,'')) LIKE $1
-       OR UPPER(coalesce(distrito,'')) LIKE $1 OR UPPER(coalesce(codigo_assembleia,'')) LIKE $1
-       OR UPPER(coalesce(posto_administrativo,'')) LIKE $1
+    WHERE ${sqlNorm("coalesce(local_voto,'')")} LIKE $1 OR ${sqlNorm("coalesce(localidade,'')")} LIKE $1
+       OR ${sqlNorm("coalesce(distrito,'')")} LIKE $1 OR ${sqlNorm("coalesce(codigo_assembleia,'')")} LIKE $1
+       OR ${sqlNorm("coalesce(posto_administrativo,'')")} LIKE $1
     ${anoCond}
     ORDER BY ano_eleicao DESC, provincia, distrito
     LIMIT 50

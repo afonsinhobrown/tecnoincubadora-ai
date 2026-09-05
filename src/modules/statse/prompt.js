@@ -33,7 +33,7 @@ export const PROMPT_STATSE = {
   ferramentas: {
     resumo_estrutura: 'cobertura e estrutura: número de mesas/locais de voto, localidades e distritos, por província e por ano/tipo (aceita ano, tipo, provincia, distrito, posto, localidade)',
     resumo_votacao: 'totais de votação: eleitores inscritos, votantes, votos válidos/nulos/brancos, abstenções e participação num âmbito (ano, provincia, distrito, posto, localidade)',
-    resultados: 'resultados por partido: votos de cada partido e vencedor num âmbito (ano, provincia, distrito, posto; opcional um partido a destacar e opcional agrupar por zona: provincia, distrito, posto ou localidade)',
+    resultados: 'resultados por partido: votos de cada partido e vencedor num âmbito (ano, provincia, distrito, posto; opcional um partido a destacar; opcional agrupar por zona: provincia, distrito, posto ou localidade; opcional ordem/critério de ordenação: votos, percentagem, % sobre inscritos, variação vs processo anterior, nome). Inclui tendência de subida/queda de cada partido face ao processo anterior, rivais mais próximos e recomendações inteligentes.',
     buscar: 'pesquisa de mesas/locais de voto, localidades, distritos ou código de assembleia por palavra-chave (opcional ano)',
     relatorio_insight: 'relatório próprio criado pela ferramenta: distribuição de partidos e vencedor por província para um ano'
   },
@@ -57,8 +57,8 @@ export const PROMPT_STATSE = {
       id: 'resultados',
       ferramenta: 'resultados',
       titulo: '🏆 Resultados por partido',
-      frases: ['resultados por partido', 'quem ganhou', 'partido vencedor', 'votos de cada partido', 'vencedor em', 'resultados em'],
-      palavras: ['resultados', 'partido', 'partidos', 'vencedor', 'ganhou', 'votos de cada', 'ganhar', 'venceu']
+      frases: ['resultados por partido', 'quem ganhou', 'partido vencedor', 'votos de cada partido', 'vencedor em', 'resultados em', 'quem subiu', 'quem caiu', 'tendencia', 'evolucao dos partidos', 'rivais mais proximos', 'ordenar por'],
+      palavras: ['resultados', 'partido', 'partidos', 'vencedor', 'ganhou', 'votos de cada', 'ganhar', 'venceu', 'tendencia', 'subiu', 'subida', 'caiu', 'queda', 'variacao', 'evolucao', 'rivais', 'proximos', 'ordenado', 'percentagem', 'inscritos', 'alfabetica', 'por provincia', 'por distrito', 'comparacao']
     },
     {
       id: 'relatorio_insight',

@@ -713,11 +713,12 @@ function renderPartidosChart(container, lista, foco) {
   lista.forEach(x => { const v = Number(x.votos) || 0; if (v > max) max = v; });
   const fn = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const focoN = fn(foco);
+  const temDelta = lista.some(x => x.delta_pct != null);
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin:12px 0;';
   const tit = document.createElement('div');
   tit.style.cssText = 'font-size:.85rem;font-weight:600;margin-bottom:8px;color:var(--azul);';
-  tit.textContent = '📊 Resultado por partido';
+  tit.textContent = '📊 Resultado por partido' + (temDelta ? ' (▲ subiu · ▼ caiu vs. anterior)' : '');
   wrap.appendChild(tit);
   lista.forEach(x => {
     const votos = Number(x.votos) || 0;
@@ -735,8 +736,13 @@ function renderPartidosChart(container, lista, foco) {
     barra.style.cssText = 'height:100%;width:' + w + '%;background:' + corPartido(x.partido) + ';';
     trilho.appendChild(barra);
     const val = document.createElement('div');
-    val.style.cssText = 'width:150px;font-size:.78rem;white-space:nowrap;color:' + (ehFoco ? 'var(--azul)' : 'var(--cinza)') + ';font-weight:' + (ehFoco ? '700' : 'normal') + ';';
-    val.textContent = Number(votos).toLocaleString('pt-MZ') + ' votos (' + pct + '%)';
+    val.style.cssText = 'width:170px;font-size:.78rem;white-space:nowrap;color:' + (ehFoco ? 'var(--azul)' : 'var(--cinza)') + ';font-weight:' + (ehFoco ? '700' : 'normal') + ';';
+    let deltaTxt = '';
+    if (x.delta_pct != null) {
+      const seta = x.delta_pct > 0 ? '▲' : x.delta_pct < 0 ? '▼' : '•';
+      deltaTxt = ' ' + seta + (x.delta_pct > 0 ? '+' : '') + x.delta_pct + ' pts';
+    }
+    val.textContent = Number(votos).toLocaleString('pt-MZ') + ' votos (' + pct + '%)' + deltaTxt;
     linha.append(lbl, trilho, val);
     wrap.appendChild(linha);
   });
@@ -784,6 +790,25 @@ function renderDados(container, dados) {
       p.style.cssText = 'margin:10px 0;font-size:.88rem;line-height:1.5;background:var(--azul-claro);color:var(--azul);border-radius:8px;padding:10px 12px;';
       p.textContent = '🧠 ' + String(dados.analise.texto);
       container.appendChild(p);
+    }
+    // tendência de subida/queda de cada partido face ao processo anterior
+    if (dados.tendencia && Array.isArray(dados.tendencia.evolucao) && dados.tendencia.evolucao.length) {
+      const ev = dados.tendencia.evolucao;
+      const h = document.createElement('div');
+      h.style.cssText = 'font-size:.85rem;font-weight:600;margin:12px 0 4px;';
+      h.textContent = '📈 Tendência por partido vs ' + (dados.tendencia.ano_anterior ?? 'anterior');
+      container.appendChild(h);
+      renderTabela(container, ev,
+        ['Partido', 'Votos', '%', 'Votos anterior', '% anterior', 'Variação pts', 'Variação votos'],
+        e => [
+          esc(String(e.partido)),
+          Number(e.votos).toLocaleString('pt-MZ'),
+          e.pct,
+          (e.votos_anterior != null ? Number(e.votos_anterior).toLocaleString('pt-MZ') : '—'),
+          (e.pct_anterior != null ? e.pct_anterior : '—'),
+          (e.delta_pct == null ? '—' : (e.delta_pct >= 0 ? '+' : '') + e.delta_pct),
+          (e.delta_votos == null ? '—' : (e.delta_votos >= 0 ? '+' : '') + Number(e.delta_votos).toLocaleString('pt-MZ'))
+        ], true);
     }
     // qualquer array de topo vira tabela (ex: partidos, provincias, por_provincia, lista)
     for (const chave of Object.keys(dados)) {
