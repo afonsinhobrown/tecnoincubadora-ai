@@ -11,15 +11,28 @@ const sql = neon(process.env.DDGEI_DATABASE_URL);
 async function inventario() {
   const [resumo] = await sql(`
     SELECT count(*)::int AS total,
-           count(*) FILTER (WHERE estado IS NOT NULL AND estado <> '')::int AS com_estado
-    FROM equipamento_rastreio
+           count(*) FILTER (WHERE status IS NOT NULL AND status <> '')::int AS com_estado,
+           count(*) FILTER (WHERE status = 'Disponível')::int AS disponiveis
+    FROM inventario_local
   `);
   const porEstado = await sql(`
-    SELECT coalesce(estado,'—') AS estado, count(*)::int AS total
-    FROM equipamento_rastreio
-    GROUP BY estado ORDER BY total DESC
+    SELECT coalesce(status,'—') AS estado, count(*)::int AS total
+    FROM inventario_local
+    GROUP BY status ORDER BY total DESC
   `);
-  return { totais: { total: resumo.total, com_estado: resumo.com_estado }, por_estado: porEstado };
+  const lista = await sql(`
+    SELECT i.id, i.equipamento AS equipamento, coalesce(i.marca,'—') AS marca,
+           coalesce(i.numero_serie,'—') AS numero_serie, coalesce(i.quantidade,1)::int AS quantidade,
+           coalesce(i.status,'—') AS estado, coalesce(s.nome,'—') AS local_uso
+    FROM inventario_local i
+    LEFT JOIN setores s ON s.id = i.setor_id
+    ORDER BY i.id DESC LIMIT 300
+  `);
+  return {
+    totais: { total: resumo.total, com_estado: resumo.com_estado, disponiveis: resumo.disponiveis },
+    por_estado: porEstado,
+    lista
+  };
 }
 
 async function tipos() {

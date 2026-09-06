@@ -23,7 +23,7 @@ export const PROMPT_DDGEI = {
   },
 
   ferramentas: {
-    inventario: 'resumo do inventário por estado',
+    inventario: 'inventário completo por estado (resumo + lista de equipamentos)',
     tipos: 'tipos de equipamento registados',
     fornecedores: 'fornecedores registados',
     funcionarios: 'funcionários registados',
@@ -45,7 +45,7 @@ export const PROMPT_DDGEI = {
       id: 'inventario',
       ferramenta: 'inventario',
       titulo: '📦 Inventário',
-      frases: ['resumo do inventário', 'inventário por estado', 'quantos equipamentos', 'estado dos equipamentos'],
+      frases: ['resumo do inventário', 'inventário completo', 'inventário por estado', 'quantos equipamentos', 'estado dos equipamentos', 'lista de equipamentos', 'todos os equipamentos', 'inventário geral'],
       palavras: ['inventário', 'inventario', 'equipamentos', 'equipamento']
     },
     {
