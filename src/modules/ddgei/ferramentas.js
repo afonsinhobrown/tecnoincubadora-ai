@@ -110,20 +110,34 @@ async function movimentos() {
   return { totais, lista };
 }
 
-async function inventarioLocal(consulta) {
-  const dict = await (async () => {
-    const s = await sql(`SELECT DISTINCT setor_id, local_uso FROM inventario_local WHERE setor_id IS NOT NULL OR local_uso IS NOT NULL AND local_uso<>''`);
-    return [];
-  })();
+async function inventarioLocal({ consulta } = {}) {
+  const dicionario = await departamentosDicionario();
+  let criterio = null;
+  if (consulta && String(consulta).trim()) {
+    const c = extrairCriterio(String(consulta), dicionario);
+    if (!c.global) criterio = c.criterio;
+  }
+  const where = criterio ? 'WHERE i.setor_id = $1' : '';
+  const params = criterio ? [criterio.valor] : [];
   const lista = await sql(`
-    SELECT id, equipamento AS equipamento, coalesce(marca,'—') AS marca,
-           coalesce(numero_serie,'—') AS numero_serie, quantidade::int AS quantidade,
-           coalesce(status,'—') AS estado, coalesce(local_uso,'—') AS local_uso
-    FROM inventario_local
-    ORDER BY local_uso, equipamento LIMIT 200
-  `);
-  const [totais] = await sql(`SELECT count(*)::int AS itens, count(*) FILTER (WHERE status='Disponível')::int AS disponiveis FROM inventario_local`);
-  return { totais, pedido: 'global', lista };
+    SELECT i.id, i.equipamento AS equipamento, coalesce(i.marca,'—') AS marca,
+           coalesce(i.numero_serie,'—') AS numero_serie, coalesce(i.quantidade,1)::int AS quantidade,
+           coalesce(i.status,'—') AS estado, coalesce(s.nome,'—') AS local_uso
+    FROM inventario_local i
+    LEFT JOIN setores s ON s.id = i.setor_id
+    ${where}
+    ORDER BY local_uso, i.equipamento LIMIT 300
+  `, params);
+  const [totais] = await sql(`
+    SELECT count(*)::int AS itens, count(*) FILTER (WHERE status='Disponível')::int AS disponiveis
+    FROM inventario_local i ${where}
+  `, params);
+  return {
+    totais,
+    pedido: criterio ? 'especifico' : 'global',
+    filtro: criterio ? { local: criterio.valor } : undefined,
+    lista
+  };
 }
 
 async function processosEleitorais() {
@@ -177,7 +191,7 @@ async function materialSobrante({ provincia } = {}) {
     LEFT JOIN eleitoral_tipo_material tm ON tm.id = ms.tipo_material_id
     ${where}
     ORDER BY ms.id DESC LIMIT 50
-  `, ...params);
+  `, params);
   const [totais] = await sql(`
     SELECT count(*)::int AS registos,
            coalesce(sum(ms.quantidade_bom),0)::int AS total_bom,
@@ -185,7 +199,7 @@ async function materialSobrante({ provincia } = {}) {
     FROM eleitoral_material_sobrante ms
     LEFT JOIN eleitoral_local_armazenamento la ON la.id = ms.local_id
     ${where}
-  `, ...params);
+  `, params);
   return {
     totais,
     pedido: criterio ? 'especifico' : 'global',
@@ -286,7 +300,7 @@ export const FERRAMENTAS_DDGEI = {
   funcionarios: (p = {}) => funcionarios(p),
   setores: () => setores(),
   movimentos: () => movimentos(),
-  inventario_local: (p = {}) => inventarioLocal(p.consulta),
+  inventario_local: (p = {}) => inventarioLocal(p),
   processos_eleitorais: () => processosEleitorais(),
   locais_armazenamento: () => locaisArmazenamento(),
   tipos_material: () => tiposMaterial(),
