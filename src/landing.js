@@ -866,15 +866,20 @@ function renderDados(container, dados) {
       const entradas = Object.entries(dados).filter(([, v]) => v != null && typeof v !== 'object' && !Array.isArray(v));
       if (entradas.length) container.innerHTML = '<div class="kpi-grid">' + kpiHtml(entradas) + '</div>';
     }
-    // faixa de âmbito sempre visível (ano + território) nos resultados eleitorais
-    if (dados.partidos && dados.partidos.length) {
+    // faixa de âmbito (ano + território) sempre visível nos resultados eleitorais
+    const esc = escopoResultado(dados.filtro);
+    const temResultEleitoral = (dados.partidos && dados.partidos.length) ||
+      (dados.por_zona && dados.por_zona.length) ||
+      (dados.tendencia && dados.tendencia.evolucao && dados.tendencia.evolucao.length) ||
+      (dados.recomendacoes && dados.recomendacoes.lista && dados.recomendacoes.lista.length);
+    if (temResultEleitoral) {
       const faixa = document.createElement('div');
       faixa.style.cssText = 'font-size:.82rem;font-weight:700;color:var(--azul);background:var(--azul-claro);padding:7px 10px;border-radius:8px;margin:8px 0 2px;';
-      faixa.textContent = '🗺️ Âmbito: ' + (escopoResultado(dados.filtro) || 'Nacional') + (dados.foco ? ' · Foco: ' + dados.foco : '');
+      faixa.textContent = '🗺️ Âmbito: ' + (esc || 'Nacional') + (dados.foco ? ' · Foco: ' + dados.foco : '');
       container.appendChild(faixa);
     }
     // gráfico colorido por partido (adversários no mesmo gráfico), destacando o foco
-    if (Array.isArray(dados.partidos) && dados.partidos.length) renderPartidosChart(container, dados.partidos, dados.foco, escopoResultado(dados.filtro));
+    if (Array.isArray(dados.partidos) && dados.partidos.length) renderPartidosChart(container, dados.partidos, dados.foco, esc);
     // realça um eventual vencedor (ex: resultados eleitorais)
     if (dados.vencedor && typeof dados.vencedor === 'object') {
       const v = dados.vencedor;
@@ -935,7 +940,8 @@ function renderDados(container, dados) {
         const chaves = Object.keys(arr[0]).filter(k => k !== 'id' && !DROP.includes(k));
         const h = document.createElement('div');
         h.style.cssText = 'font-size:.85rem;font-weight:600;margin:10px 0 4px;';
-        h.textContent = cap(String(chave).replace(/_/g, ' '));
+        const ehEleitoral = arr[0] && ('partido' in arr[0] || 'zona' in arr[0] || 'localidade' in arr[0]);
+        h.textContent = cap(String(chave).replace(/_/g, ' ')) + (ehEleitoral && esc ? ' — ' + esc : '');
         container.appendChild(h);
         const etiquetas = chaves.map(c => LABEL_STATSE[c] || cap(String(c).replace(/_/g, ' ')));
         renderTabela(container, arr, etiquetas,
