@@ -359,43 +359,43 @@ async function resultados({ ano, tipo, provincia, distrito, posto, localidade, a
       // se o utilizador indicou um partido, centra a recomendação nesse partido
       const alvo = (foco && evolucao.find(e => matchPartido(e.partido))) || null;
       if (alvo) {
-        if (subiu(alvo)) rec.push(`O ${alvo.partido} subiu ${alvo.delta_pct} pontos vs ${prevAno} (${alvo.pct_anterior}% → ${alvo.pct}%) — tendência favorável; vale reforçar onde cresceu e consolidar o avanço.`);
-        else if (desceu(alvo)) rec.push(`Atenção: o ${alvo.partido} que pediste caiu ${Math.abs(alvo.delta_pct)} pontos vs ${prevAno} (${alvo.pct_anterior}% → ${alvo.pct}%) — investigar a perda e agir antes do próximo ciclo.`);
-        else if (alvo.pct_anterior != null) rec.push(`O ${alvo.partido} manteve-se estável vs ${prevAno} (${alvo.pct}%) — sem grandes ganhos nem perdas; procurar margem nos indecisos.`);
+        if (subiu(alvo)) rec.push({ tema: 'Tendência ' + alvo.partido, sugestao: `O ${alvo.partido} subiu ${alvo.delta_pct} pontos vs ${prevAno} (${alvo.pct_anterior}% → ${alvo.pct}%) — tendência favorável; vale reforçar onde cresceu e consolidar o avanço.` });
+        else if (desceu(alvo)) rec.push({ tema: 'Alerta', sugestao: `Atenção: o ${alvo.partido} que pediste caiu ${Math.abs(alvo.delta_pct)} pontos vs ${prevAno} (${alvo.pct_anterior}% → ${alvo.pct}%) — investigar a perda e agir antes do próximo ciclo.` });
+        else if (alvo.pct_anterior != null) rec.push({ tema: 'Tendência ' + alvo.partido, sugestao: `O ${alvo.partido} manteve-se estável vs ${prevAno} (${alvo.pct}%) — sem grandes ganhos nem perdas; procurar margem nos indecisos.` });
       }
       if (!alvo && lider) {
-        if (subiu(lider)) rec.push(`O ${lider.partido} subiu ${lider.delta_pct} pontos face a ${prevAno} (${lider.pct_anterior}% → ${lider.pct}%) — tendência favorável; recomenda-se consolidar a base e alargar nos distritos onde está mais fraco.`);
-        else if (desceu(lider)) rec.push(`Atenção: o ${lider.partido} caiu ${Math.abs(lider.delta_pct)} pontos vs ${prevAno} — investigar perda e reforçar a mobilização.`);
+        if (subiu(lider)) rec.push({ tema: 'Tendência ' + lider.partido, sugestao: `O ${lider.partido} subiu ${lider.delta_pct} pontos face a ${prevAno} (${lider.pct_anterior}% → ${lider.pct}%) — tendência favorável; recomenda-se consolidar a base e alargar nos distritos onde está mais fraco.` });
+        else if (desceu(lider)) rec.push({ tema: 'Alerta', sugestao: `Atenção: o ${lider.partido} caiu ${Math.abs(lider.delta_pct)} pontos vs ${prevAno} — investigar perda e reforçar a mobilização.` });
       }
       // quem ameaça o partido pedido (ou o líder)
       const ameacador = alvo ? alvo : lider;
       if (ameacador) {
         const rivaisSubindo = evolucao.filter(e => e.partido !== ameacador.partido && e.votos <= ameacador.votos && subiu(e)).slice(0, 2);
-        for (const r of rivaisSubindo) rec.push(`Alerta: ${r.partido} cresceu ${r.delta_pct} pontos vs ${prevAno} (${r.pct_anterior}% → ${r.pct}%) — aproxima-se; monitorizar de perto.`);
+        for (const r of rivaisSubindo) rec.push({ tema: 'Rivais', sugestao: `Alerta: ${r.partido} cresceu ${r.delta_pct} pontos vs ${prevAno} (${r.pct_anterior}% → ${r.pct}%) — aproxima-se; monitorizar de perto.` });
       }
       // nulos/brancos como sinal
       const pctNB = votantes ? Math.round((nulosBrancos / votantes) * 1000) / 10 : 0;
       const pctNBPrev = votPrev ? Math.round((nbPrev / votPrev) * 1000) / 10 : 0;
-      if (pctNB >= 3) rec.push(`Nulos e brancos somam ${pctNB}% dos votos (${nulosBrancos.toLocaleString('pt-MZ')})${pctNBPrev ? `, vs ${pctNBPrev}% no ${prevAno}` : ''} — sinal de descontentamento que pode ser convertido; vale apostar numa comunicação clara e no combate à abstenção.`);
-      else if (pctNBPrev && pctNB > pctNBPrev) rec.push(`Nulos e brancos subiram para ${pctNB}% (antes ${pctNBPrev}%) — atenção a possível protesto; rever mensagem e listas.`);
+      if (pctNB >= 3) rec.push({ tema: 'Nulos e brancos', sugestao: `Nulos e brancos somam ${pctNB}% dos votos (${nulosBrancos.toLocaleString('pt-MZ')})${pctNBPrev ? `, vs ${pctNBPrev}% no ${prevAno}` : ''} — sinal de descontentamento que pode ser convertido; vale apostar numa comunicação clara e no combate à abstenção.` });
+      else if (pctNBPrev && pctNB > pctNBPrev) rec.push({ tema: 'Nulos e brancos', sugestao: `Nulos e brancos subiram para ${pctNB}% (antes ${pctNBPrev}%) — atenção a possível protesto; rever mensagem e listas.` });
       // abstenção
       const abst = Math.round((100 - participacao_pct) * 10) / 10;
       const abstPrev = tendencia.abstenção_anterior;
-      if (abstPrev != null && abst > abstPrev) rec.push(`A abstenção subiu de ${abstPrev}% para ${abst}% — há eleitores em fuga; recomenda-se campanha de mobilização porta-a-porta e foco nos indecisos.`);
-      if (!rec.length) rec.push('Sem variações relevantes face ao ciclo anterior; manter a estratégia e acompanhar os indicadores de participação.');
-      recomendacoes = { texto: rec.join(' ') };
+      if (abstPrev != null && abst > abstPrev) rec.push({ tema: 'Abstenção', sugestao: `A abstenção subiu de ${abstPrev}% para ${abst}% — há eleitores em fuga; recomenda-se campanha de mobilização porta-a-porta e foco nos indecisos.` });
+      if (!rec.length) rec.push({ tema: 'Estratégia', sugestao: 'Sem variações relevantes face ao ciclo anterior; manter a estratégia e acompanhar os indicadores de participação.' });
+      recomendacoes = { titulo: '✅ Recomendações', texto: rec.map(r => r.sugestao).join(' '), lista: rec };
     } else {
       // Sem ciclo anterior: ainda assim destaca nulos/brancos e abstenção do próprio ano
       const rec2 = [];
       const pctNB2 = votantes ? Math.round((nulosBrancos / votantes) * 1000) / 10 : 0;
-      if (pctNB2 >= 3) rec2.push(`Nulos e brancos somam ${pctNB2}% dos votos (${nulosBrancos.toLocaleString('pt-MZ')}) — sinal de descontentamento que pode ser convertido; vale apostar numa comunicação clara e no combate à abstenção.`);
+      if (pctNB2 >= 3) rec2.push({ tema: 'Nulos e brancos', sugestao: `Nulos e brancos somam ${pctNB2}% dos votos (${nulosBrancos.toLocaleString('pt-MZ')}) — sinal de descontentamento que pode ser convertido; vale apostar numa comunicação clara e no combate à abstenção.` });
       const abst2 = Math.round((100 - participacao_pct) * 10) / 10;
-      if (abst2 >= 30) rec2.push(`A abstenção é alta (${abst2}%) — há eleitores por mobilizar; recomenda-se campanha porta-a-porta e foco nos indecisos.`);
-      if (!rec2.length) rec2.push('Não há resultados anteriores deste círculo para comparar tendências — este é o primeiro ciclo registado.');
-      recomendacoes = { texto: rec2.join(' ') };
+      if (abst2 >= 30) rec2.push({ tema: 'Abstenção', sugestao: `A abstenção é alta (${abst2}%) — há eleitores por mobilizar; recomenda-se campanha porta-a-porta e foco nos indecisos.` });
+      if (!rec2.length) rec2.push({ tema: 'Comparação', sugestao: 'Não há resultados anteriores deste círculo para comparar tendências — este é o primeiro ciclo registado.' });
+      recomendacoes = { titulo: '✅ Recomendações', texto: rec2.map(r => r.sugestao).join(' '), lista: rec2 };
     }
   } catch (e) {
-    tendencia = null; recomendacoes = { texto: '' };
+    tendencia = null; recomendacoes = { titulo: '', texto: '', lista: [] };
   }
 
   // funde a tendência (delta face ao ano anterior) em cada partido
