@@ -705,6 +705,17 @@ function corPartido(nome) {
   return pal[h % pal.length];
 }
 
+// destaque das linhas do partido pedido (foco) vs outros partidos
+function ehFocoRow(r, foco) {
+  const fn = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return !!(foco && r && r.partido != null && fn(r.partido) === fn(foco));
+}
+function corLinhaFoco(r, foco) {
+  return ehFocoRow(r, foco)
+    ? 'background:' + corPartido(r.partido) + '1f;font-weight:700;'
+    : null;
+}
+
 // Gráfico de barras horizontal: adversários no mesmo gráfico, cada um com cor própria
 function renderPartidosChart(container, lista, foco) {
   if (!Array.isArray(lista) || !lista.length) return;
@@ -712,11 +723,12 @@ function renderPartidosChart(container, lista, foco) {
   lista.forEach(x => { const v = Number(x.votos) || 0; if (v > max) max = v; });
   const fn = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const focoN = fn(foco);
+  const temDelta = lista.some(x => x.delta_pct != null);
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin:12px 0;';
   const tit = document.createElement('div');
   tit.style.cssText = 'font-size:.85rem;font-weight:600;margin-bottom:8px;color:var(--azul);';
-  tit.textContent = '📊 Resultado por partido';
+  tit.textContent = '📊 Resultado por partido' + (temDelta ? ' (▲ subiu · ▼ caiu vs. anterior)' : '');
   wrap.appendChild(tit);
   lista.forEach(x => {
     const votos = Number(x.votos) || 0;
@@ -724,7 +736,7 @@ function renderPartidosChart(container, lista, foco) {
     const w = Math.max(3, Math.round((votos / max) * 100));
     const ehFoco = focoN && fn(x.partido) === focoN;
     const linha = document.createElement('div');
-    linha.style.cssText = 'display:flex;align-items:center;margin:4px 0;gap:6px;';
+    linha.style.cssText = 'display:flex;align-items:center;margin:4px 0;gap:6px;' + (ehFoco ? 'background:' + corPartido(x.partido) + '1f;border-radius:6px;' : '');
     const lbl = document.createElement('div');
     lbl.style.cssText = 'width:96px;font-size:.78rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cinza);font-weight:' + (ehFoco ? '700' : 'normal') + ';';
     lbl.textContent = (ehFoco ? '▶ ' : '') + x.partido;
@@ -734,8 +746,13 @@ function renderPartidosChart(container, lista, foco) {
     barra.style.cssText = 'height:100%;width:' + w + '%;background:' + corPartido(x.partido) + ';';
     trilho.appendChild(barra);
     const val = document.createElement('div');
-    val.style.cssText = 'width:150px;font-size:.78rem;white-space:nowrap;color:' + (ehFoco ? 'var(--azul)' : 'var(--cinza)') + ';font-weight:' + (ehFoco ? '700' : 'normal') + ';';
-    val.textContent = Number(votos).toLocaleString('pt-MZ') + ' votos (' + pct + '%)';
+    val.style.cssText = 'width:170px;font-size:.78rem;white-space:nowrap;color:' + (ehFoco ? 'var(--azul)' : 'var(--cinza)') + ';font-weight:' + (ehFoco ? '700' : 'normal') + ';';
+    let deltaTxt = '';
+    if (x.delta_pct != null) {
+      const seta = x.delta_pct > 0 ? '▲' : x.delta_pct < 0 ? '▼' : '•';
+      deltaTxt = ' ' + seta + (x.delta_pct > 0 ? '+' : '') + x.delta_pct + ' pts';
+    }
+    val.textContent = Number(votos).toLocaleString('pt-MZ') + ' votos (' + pct + '%)' + deltaTxt;
     linha.append(lbl, trilho, val);
     wrap.appendChild(linha);
   });
@@ -784,6 +801,25 @@ function renderDados(container, dados) {
       p.textContent = '🧠 ' + String(dados.analise.texto);
       container.appendChild(p);
     }
+    // tendência de subida/queda de cada partido face ao processo anterior
+    if (dados.tendencia && Array.isArray(dados.tendencia.evolucao) && dados.tendencia.evolucao.length) {
+      const ev = dados.tendencia.evolucao;
+      const h = document.createElement('div');
+      h.style.cssText = 'font-size:.85rem;font-weight:600;margin:12px 0 4px;';
+      h.textContent = '📈 Tendência por partido vs ' + (dados.tendencia.ano_anterior ?? 'anterior');
+      container.appendChild(h);
+      renderTabela(container, ev,
+        ['Partido', 'Votos', '%', 'Votos anterior', '% anterior', 'Variação pts', 'Variação votos'],
+        e => [
+          esc(String(e.partido)),
+          Number(e.votos).toLocaleString('pt-MZ'),
+          e.pct,
+          (e.votos_anterior != null ? Number(e.votos_anterior).toLocaleString('pt-MZ') : '—'),
+          (e.pct_anterior != null ? e.pct_anterior : '—'),
+          (e.delta_pct == null ? '—' : (e.delta_pct >= 0 ? '+' : '') + e.delta_pct),
+          (e.delta_votos == null ? '—' : (e.delta_votos >= 0 ? '+' : '') + Number(e.delta_votos).toLocaleString('pt-MZ'))
+        ], true, null, r => corLinhaFoco(r, dados.foco));
+    }
     // qualquer array de topo vira tabela (ex: partidos, provincias, por_provincia, lista)
     for (const chave of Object.keys(dados)) {
       const arr = dados[chave];
@@ -794,7 +830,7 @@ function renderDados(container, dados) {
         h.textContent = cap(String(chave).replace(/_/g, ' '));
         container.appendChild(h);
         renderTabela(container, arr, chaves.map(c => cap(String(c).replace(/_/g, ' '))),
-          r => chaves.map(c => esc(String(r[c] ?? ''))));
+          r => chaves.map(c => esc(String(r[c] ?? ''))), false, null, r => corLinhaFoco(r, dados.foco));
       }
     }
   }
@@ -845,13 +881,15 @@ function renderClientes(container, d) {
   }
 }
 
-function renderTabela(container, linhas, cab, fmt, numCols = false, onClick = null) {
+function renderTabela(container, linhas, cab, fmt, numCols = false, onClick = null, destacar = null) {
   const tb = document.createElement('table');
   tb.className = 'tab';
   tb.innerHTML = '<thead><tr>' + cab.map((c, i) => `<th class="${i > 0 ? 'num' : ''}">${c}</th>`).join('') + '</tr></thead>';
   const corpo = document.createElement('tbody');
   linhas.forEach(r => {
     const tr = document.createElement('tr');
+    const stl = destacar ? destacar(r) : null;
+    if (stl) tr.style.cssText = stl;
     tr.innerHTML = fmt(r).map((c, i) => `<td class="${i > 0 ? 'num' : ''}">${c}</td>`).join('');
     if (onClick) { tr.style.cursor = 'pointer'; tr.onclick = () => onClick(r); }
     corpo.appendChild(tr);
@@ -936,3 +974,4 @@ elPass.addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 </script>
 </body>
 </html>
+

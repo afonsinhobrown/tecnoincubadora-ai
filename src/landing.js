@@ -706,6 +706,17 @@ function corPartido(nome) {
   return pal[h % pal.length];
 }
 
+// destaque das linhas do partido pedido (foco) vs outros partidos
+function ehFocoRow(r, foco) {
+  const fn = s => String(s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return !!(foco && r && r.partido != null && fn(r.partido) === fn(foco));
+}
+function corLinhaFoco(r, foco) {
+  return ehFocoRow(r, foco)
+    ? 'background:' + corPartido(r.partido) + '1f;font-weight:700;'
+    : null;
+}
+
 // Gráfico de barras horizontal: adversários no mesmo gráfico, cada um com cor própria
 function renderPartidosChart(container, lista, foco) {
   if (!Array.isArray(lista) || !lista.length) return;
@@ -726,7 +737,7 @@ function renderPartidosChart(container, lista, foco) {
     const w = Math.max(3, Math.round((votos / max) * 100));
     const ehFoco = focoN && fn(x.partido) === focoN;
     const linha = document.createElement('div');
-    linha.style.cssText = 'display:flex;align-items:center;margin:4px 0;gap:6px;';
+    linha.style.cssText = 'display:flex;align-items:center;margin:4px 0;gap:6px;' + (ehFoco ? 'background:' + corPartido(x.partido) + '1f;border-radius:6px;' : '');
     const lbl = document.createElement('div');
     lbl.style.cssText = 'width:96px;font-size:.78rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cinza);font-weight:' + (ehFoco ? '700' : 'normal') + ';';
     lbl.textContent = (ehFoco ? '▶ ' : '') + x.partido;
@@ -808,7 +819,7 @@ function renderDados(container, dados) {
           (e.pct_anterior != null ? e.pct_anterior : '—'),
           (e.delta_pct == null ? '—' : (e.delta_pct >= 0 ? '+' : '') + e.delta_pct),
           (e.delta_votos == null ? '—' : (e.delta_votos >= 0 ? '+' : '') + Number(e.delta_votos).toLocaleString('pt-MZ'))
-        ], true);
+        ], true, null, r => corLinhaFoco(r, dados.foco));
     }
     // qualquer array de topo vira tabela (ex: partidos, provincias, por_provincia, lista)
     for (const chave of Object.keys(dados)) {
@@ -820,7 +831,7 @@ function renderDados(container, dados) {
         h.textContent = cap(String(chave).replace(/_/g, ' '));
         container.appendChild(h);
         renderTabela(container, arr, chaves.map(c => cap(String(c).replace(/_/g, ' '))),
-          r => chaves.map(c => esc(String(r[c] ?? ''))));
+          r => chaves.map(c => esc(String(r[c] ?? ''))), false, null, r => corLinhaFoco(r, dados.foco));
       }
     }
   }
@@ -871,13 +882,15 @@ function renderClientes(container, d) {
   }
 }
 
-function renderTabela(container, linhas, cab, fmt, numCols = false, onClick = null) {
+function renderTabela(container, linhas, cab, fmt, numCols = false, onClick = null, destacar = null) {
   const tb = document.createElement('table');
   tb.className = 'tab';
   tb.innerHTML = '<thead><tr>' + cab.map((c, i) => \`<th class="\${i > 0 ? 'num' : ''}">\${c}</th>\`).join('') + '</tr></thead>';
   const corpo = document.createElement('tbody');
   linhas.forEach(r => {
     const tr = document.createElement('tr');
+    const stl = destacar ? destacar(r) : null;
+    if (stl) tr.style.cssText = stl;
     tr.innerHTML = fmt(r).map((c, i) => \`<td class="\${i > 0 ? 'num' : ''}">\${c}</td>\`).join('');
     if (onClick) { tr.style.cursor = 'pointer'; tr.onclick = () => onClick(r); }
     corpo.appendChild(tr);
