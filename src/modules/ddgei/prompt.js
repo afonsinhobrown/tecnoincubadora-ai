@@ -29,7 +29,7 @@ export const PROMPT_DDGEI = {
     funcionarios: 'funcionários registados',
     setores: 'setores da instituição',
     movimentos: 'movimentos de equipamentos (entradas/saídas)',
-    inventario_local: 'inventário de material por local/setor (equipamento, quantidade, estado)',
+    inventario_local: 'inventário de material por local/setor e por tipo de equipamento (equipamento, quantidade, estado)',
     processos_eleitorais: 'processos eleitorais (recenseamento, votação) e o seu estado',
     locais_armazenamento: 'locais de armazenamento de material eleitoral',
     tipos_material: 'tipos de material eleitoral',
@@ -37,7 +37,7 @@ export const PROMPT_DDGEI = {
     material_sobrante: 'material sobrante (bom/mau) por local',
     relatorios: 'relatório tipo dashboard: inventário, entradas/saídas, movimentos e estatísticas (por equipamento, origem e marca)',
     relatorio_insight: 'relatório próprio criado pela ferramenta: distribuição de funcionários por departamento, movimentos por tipo/estado, equipamentos por estado',
-    buscar_equipamento: 'busca de equipamentos por nome/marca/série'
+    buscar_equipamento: 'busca de equipamentos no inventário por nome/marca/série'
   },
 
   intencoes: [
@@ -94,8 +94,8 @@ export const PROMPT_DDGEI = {
       id: 'inventario_local',
       ferramenta: 'inventario_local',
       titulo: '📦 Inventário por local',
-      frases: ['inventário de material', 'stock no local', 'material por setor', 'inventário por local'],
-      palavras: ['inventário', 'inventario', 'stock', 'material', 'local de armazenamento']
+      frases: ['inventário de material', 'stock no local', 'material por setor', 'inventário por local', 'dados de laptop', 'dados de desktop', 'dados de impressora'],
+      palavras: ['inventário', 'inventario', 'stock', 'material', 'local de armazenamento', 'laptop', 'desktop', 'impressora', 'monitor', 'scanner', 'cadeira', 'mesa', 'equipamento']
     },
     {
       id: 'processos_eleitorais',
@@ -138,6 +138,13 @@ export const PROMPT_DDGEI = {
       titulo: '📈 Relatório próprio',
       frases: ['resumo de funcionários por departamento', 'funcionários por departamento', 'movimentos por tipo', 'equipamentos por estado', 'visão geral do ddgei'],
       palavras: ['funcionários por departamento', 'funcionarios por departamento', 'visão geral', 'visao geral', 'resumo geral', 'movimentos por tipo']
+    },
+    {
+      id: 'buscar_equipamento',
+      ferramenta: 'buscar_equipamento',
+      titulo: '🔍 Buscar equipamento',
+      frases: ['busca de equipamentos', 'procurar equipamento', 'dados do equipamento', 'equipamento por nome', 'equipamento por marca', 'equipamento por série'],
+      palavras: ['buscar', 'procurar', 'por nome', 'por marca', 'por série', 'por serie', 'procura', 'pesquisar']
     }
   ],
 

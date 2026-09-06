@@ -82,6 +82,11 @@ export function criarMotor(prompt, ferramentas, gatilhosRecusa = GATILHOS_RECUSA
           properties: { termos: { type: 'STRING', description: 'Termos do produto/serviço a procurar' } },
           required: ['termos']
         });
+      } else if (nome === 'buscar_equipamento') {
+        add(nome, desc, {
+          type: 'OBJECT',
+          properties: { termos: { type: 'STRING', description: 'Nome, marca ou número de série do equipamento a procurar' } }
+        });
       } else if (nome === 'detalhe_produto') {
         add(nome, desc, {
           type: 'OBJECT',

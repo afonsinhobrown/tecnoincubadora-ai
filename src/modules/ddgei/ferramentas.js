@@ -8,30 +8,52 @@ import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DDGEI_DATABASE_URL);
 
-async function inventario() {
+import { extrairCriterio } from '../../criterios/index.js';
+
+// Tipo de equipamento mencionado na pergunta (ex "laptop", "impressora").
+// Devolve o nome real em inventario_local, ou null se a pergunta não o citar.
+async function tipoEquipamentoDaConsulta(consulta) {
+  const q = String(consulta || '').trim();
+  if (!q) return null;
+  const tipos = await sql(`SELECT nome FROM tipos_equipamento WHERE nome IS NOT NULL AND lower(nome) <> 'outro' ORDER BY nome`);
+  const dicionario = tipos.map(t => ({ rotulo: t.nome, rotuloCurto: t.nome, valor: t.nome, campo: 'equipamento' }));
+  const c = extrairCriterio(q, dicionario);
+  return c.global ? null : c.criterio.valor;
+}
+
+async function inventario({ consulta } = {}) {
+  const tipo = await tipoEquipamentoDaConsulta(consulta);
+  const where = tipo ? `WHERE i.equipamento ILIKE $1` : '';
+  const params = tipo ? [`%${tipo}%`] : [];
   const [resumo] = await sql(`
     SELECT count(*)::int AS total,
            count(*) FILTER (WHERE status IS NOT NULL AND status <> '')::int AS com_estado,
            count(*) FILTER (WHERE status = 'Disponível')::int AS disponiveis
-    FROM inventario_local
-  `);
+    FROM inventario_local i
+    ${where}
+  `, params);
   const porEstado = await sql(`
     SELECT coalesce(status,'—') AS estado, count(*)::int AS total
-    FROM inventario_local
+    FROM inventario_local i
+    ${where}
     GROUP BY status ORDER BY total DESC
-  `);
+  `, params);
   const lista = await sql(`
     SELECT i.id, i.equipamento AS equipamento, coalesce(i.marca,'—') AS marca,
            coalesce(i.numero_serie,'—') AS numero_serie, coalesce(i.quantidade,1)::int AS quantidade,
            coalesce(i.status,'—') AS estado, coalesce(s.nome,'—') AS local_uso
     FROM inventario_local i
     LEFT JOIN setores s ON s.id = i.setor_id
+    ${where}
     ORDER BY i.id DESC LIMIT 300
-  `);
+  `, params);
+  const filtro = tipo ? { equipamento: tipo } : undefined;
   return {
     totais: { total: resumo.total, com_estado: resumo.com_estado, disponiveis: resumo.disponiveis },
     por_estado: porEstado,
-    lista
+    lista,
+    pedido: tipo ? 'especifico' : 'global',
+    filtro
   };
 }
 
@@ -43,8 +65,6 @@ async function fornecedores() {
   const lista = await sql(`SELECT id, nome FROM fornecedores ORDER BY nome ASC LIMIT 100`);
   return { totais: { fornecedores: lista.length, novos_30d: 0 }, lista };
 }
-
-import { extrairCriterio } from '../../criterios/index.js';
 
 // Dicionário de departamentos reais (setores) para distinguir global/específico
 async function departamentosDicionario() {
@@ -117,8 +137,14 @@ async function inventarioLocal({ consulta } = {}) {
     const c = extrairCriterio(String(consulta), dicionario);
     if (!c.global) criterio = c.criterio;
   }
-  const where = criterio ? 'WHERE i.setor_id = $1' : '';
-  const params = criterio ? [criterio.valor] : [];
+  const tipo = await tipoEquipamentoDaConsulta(consulta);
+
+  const conds = [];
+  const params = [];
+  if (criterio) { conds.push('i.setor_id = $' + (params.length + 1)); params.push(criterio.valor); }
+  if (tipo) { conds.push('i.equipamento ILIKE $' + (params.length + 1)); params.push(`%${tipo}%`); }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+
   const lista = await sql(`
     SELECT i.id, i.equipamento AS equipamento, coalesce(i.marca,'—') AS marca,
            coalesce(i.numero_serie,'—') AS numero_serie, coalesce(i.quantidade,1)::int AS quantidade,
@@ -132,10 +158,15 @@ async function inventarioLocal({ consulta } = {}) {
     SELECT count(*)::int AS itens, count(*) FILTER (WHERE status='Disponível')::int AS disponiveis
     FROM inventario_local i ${where}
   `, params);
+
+  const filtro = {
+    ...(criterio ? { local: criterio.valor } : {}),
+    ...(tipo ? { equipamento: tipo } : {})
+  };
   return {
     totais,
-    pedido: criterio ? 'especifico' : 'global',
-    filtro: criterio ? { local: criterio.valor } : undefined,
+    pedido: (criterio || tipo) ? 'especifico' : 'global',
+    filtro: Object.keys(filtro).length ? filtro : undefined,
     lista
   };
 }
@@ -208,13 +239,24 @@ async function materialSobrante({ provincia } = {}) {
   };
 }
 
-async function buscarEquipamento(termos) {
-  const t = `%${String(termos || '').toLowerCase()}%`;
+async function buscarEquipamento({ termos, consulta } = {}) {
+  let base = String(termos || '').trim().toLowerCase();
+  if (!base && consulta) {
+    // se o modelo não enviou termos, deduz o tipo de equipamento do pedido
+    const tipo = await tipoEquipamentoDaConsulta(consulta);
+    base = (tipo || String(consulta)).toLowerCase();
+  }
+  const t = `%${base}%`;
   return sql(`
-    SELECT id, equipamento AS nome, marca, numero_serie, estado, local_atual
-    FROM equipamento_rastreio
-    WHERE lower(coalesce(equipamento,'')) LIKE $1 OR lower(coalesce(marca,'')) LIKE $1 OR lower(coalesce(numero_serie,'')) LIKE $1
-    ORDER BY id DESC LIMIT 20
+    SELECT i.id, i.equipamento AS nome, coalesce(i.marca,'—') AS marca,
+           coalesce(i.numero_serie,'—') AS numero_serie, coalesce(i.quantidade,1)::int AS quantidade,
+           coalesce(i.status,'—') AS estado, coalesce(s.nome,'—') AS local_uso
+    FROM inventario_local i
+    LEFT JOIN setores s ON s.id = i.setor_id
+    WHERE lower(coalesce(i.equipamento,'')) LIKE $1
+       OR lower(coalesce(i.marca,'')) LIKE $1
+       OR lower(coalesce(i.numero_serie,'')) LIKE $1
+    ORDER BY i.id DESC LIMIT 20
   `, [t]);
 }
 
@@ -294,7 +336,7 @@ async function relatorioInsight({ consulta } = {}) {
 }
 
 export const FERRAMENTAS_DDGEI = {
-  inventario: () => inventario(),
+  inventario: (p = {}) => inventario(p),
   tipos: () => tipos(),
   fornecedores: () => fornecedores(),
   funcionarios: (p = {}) => funcionarios(p),
@@ -308,7 +350,7 @@ export const FERRAMENTAS_DDGEI = {
   material_sobrante: (p = {}) => materialSobrante(p),
   relatorios: (p = {}) => relatorios(p),
   relatorio_insight: (p = {}) => relatorioInsight(p),
-  buscar_equipamento: (p = {}) => buscarEquipamento(p.termos)
+  buscar_equipamento: (p = {}) => buscarEquipamento(p)
 };
 
 export async function executarFerramentaDdgei(nome, params = {}) {
