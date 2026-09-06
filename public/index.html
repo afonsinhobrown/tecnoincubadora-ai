@@ -723,9 +723,17 @@ function escopoResultado(f) {
   const tipo = f.tipo ? String(f.tipo).trim() : '';
   if (tipo) bits.push(cap(tipo));
   if (f.ano) bits.push('Ano ' + f.ano);
-  const geo = f.localidade || f.posto || f.distrito || f.provincia;
-  if (geo) bits.push('📍 ' + String(geo));
-  else if (f.agrupar) bits.push('📍 por ' + cap(String(f.agrupar).replace(/_/g, ' ')));
+  const niveis = [
+    ['localidade', 'Localidade de'],
+    ['posto', 'Posto administrativo de'],
+    ['distrito', 'Distrito de'],
+    ['provincia', 'Província de']
+  ];
+  let temGeo = false;
+  for (const [k, pre] of niveis) {
+    if (f[k]) { bits.push('📍 ' + pre + ' ' + String(f[k])); temGeo = true; break; }
+  }
+  if (!temGeo && f.agrupar) bits.push('📍 agrupado por ' + cap(String(f.agrupar).replace(/_/g, ' ')));
   if (!bits.length) bits.push('Nacional');
   return bits.join(' · ');
 }
@@ -856,6 +864,13 @@ function renderDados(container, dados) {
     } else {
       const entradas = Object.entries(dados).filter(([, v]) => v != null && typeof v !== 'object' && !Array.isArray(v));
       if (entradas.length) container.innerHTML = '<div class="kpi-grid">' + kpiHtml(entradas) + '</div>';
+    }
+    // faixa de âmbito sempre visível (ano + território) nos resultados eleitorais
+    if (dados.partidos && dados.partidos.length) {
+      const faixa = document.createElement('div');
+      faixa.style.cssText = 'font-size:.82rem;font-weight:700;color:var(--azul);background:var(--azul-claro);padding:7px 10px;border-radius:8px;margin:8px 0 2px;';
+      faixa.textContent = '🗺️ Âmbito: ' + (escopoResultado(dados.filtro) || 'Nacional') + (dados.foco ? ' · Foco: ' + dados.foco : '');
+      container.appendChild(faixa);
     }
     // gráfico colorido por partido (adversários no mesmo gráfico), destacando o foco
     if (Array.isArray(dados.partidos) && dados.partidos.length) renderPartidosChart(container, dados.partidos, dados.foco, escopoResultado(dados.filtro));
