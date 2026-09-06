@@ -716,8 +716,41 @@ function corLinhaFoco(r, foco) {
     : null;
 }
 
+// rótulo de âmbito (ano + espaço territorial) sempre visível nos resultados
+function escopoResultado(f) {
+  if (!f || typeof f !== 'object') return '';
+  const bits = [];
+  const tipo = f.tipo ? String(f.tipo).trim() : '';
+  if (tipo) bits.push(cap(tipo));
+  if (f.ano) bits.push('Ano ' + f.ano);
+  const geo = f.localidade || f.posto || f.distrito || f.provincia;
+  if (geo) bits.push('📍 ' + String(geo));
+  else if (f.agrupar) bits.push('📍 por ' + cap(String(f.agrupar).replace(/_/g, ' ')));
+  if (!bits.length) bits.push('Nacional');
+  return bits.join(' · ');
+}
+
+// rótulos amigáveis e formatação para tabelas de resultados eleitorais
+const LABEL_STATSE = {
+  partido: 'Partido', votos: 'Votos', pct: '%',
+  percentual_validos: '% votos válidos', percentual_inscritos: '% inscritos',
+  pct_anterior: '% anterior', votos_anterior: 'Votos anterior',
+  delta_pct: 'Variação %', delta_votos: 'Variação votos',
+  diferenca_votos: 'Diferença votos', sentido: 'Sentido',
+  zona: 'Zona', total_votos: 'Total votos', vencedor: 'Vencedor'
+};
+function valTabelaStatse(k, v) {
+  if (v == null || v === '') return '—';
+  if (typeof v === 'number') {
+    if (['votos', 'votos_anterior', 'diferenca_votos', 'delta_votos', 'total_votos'].includes(k)) return Number(v).toLocaleString('pt-MZ');
+    if (['delta_pct', 'delta_votos'].includes(k)) return (v >= 0 ? '+' : '') + v;
+    return String(v);
+  }
+  return String(v);
+}
+
 // Gráfico de barras horizontal: adversários no mesmo gráfico, cada um com cor própria
-function renderPartidosChart(container, lista, foco) {
+function renderPartidosChart(container, lista, foco, escopo) {
   if (!Array.isArray(lista) || !lista.length) return;
   let max = 1;
   lista.forEach(x => { const v = Number(x.votos) || 0; if (v > max) max = v; });
@@ -728,7 +761,7 @@ function renderPartidosChart(container, lista, foco) {
   wrap.style.cssText = 'margin:12px 0;';
   const tit = document.createElement('div');
   tit.style.cssText = 'font-size:.85rem;font-weight:600;margin-bottom:8px;color:var(--azul);';
-  tit.textContent = '📊 Resultado por partido' + (temDelta ? ' (▲ subiu · ▼ caiu vs. anterior)' : '');
+  tit.textContent = '📊 Resultado por partido' + (escopo ? ' · ' + escopo : '') + (temDelta ? ' (▲ subiu · ▼ caiu vs. anterior)' : '');
   wrap.appendChild(tit);
   lista.forEach(x => {
     const votos = Number(x.votos) || 0;
@@ -753,6 +786,47 @@ function renderPartidosChart(container, lista, foco) {
       deltaTxt = ' ' + seta + (x.delta_pct > 0 ? '+' : '') + x.delta_pct + ' pts';
     }
     val.textContent = Number(votos).toLocaleString('pt-MZ') + ' votos (' + pct + '%)' + deltaTxt;
+    linha.append(lbl, trilho, val);
+    wrap.appendChild(linha);
+  });
+  container.appendChild(wrap);
+}
+
+// Gráfico que ilustra as tendências: barra cinzenta = ano anterior, barra a cor = ano atual
+function renderTendenciaChart(container, ev, anoAnt, foco) {
+  let max = 1;
+  ev.forEach(x => { const v = Math.max(Number(x.pct) || 0, Number(x.pct_anterior) || 0); if (v > max) max = v; });
+  const fn = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const focoN = fn(foco);
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin:4px 0 10px;';
+  if (anoAnt) {
+    const leg = document.createElement('div');
+    leg.style.cssText = 'font-size:.7rem;color:var(--cinza);margin-bottom:6px;';
+    leg.textContent = '■ ' + anoAnt + ' · ■ atual (' + String(ev[0]?.ano ?? '') + ')';
+    wrap.appendChild(leg);
+  }
+  ev.forEach(x => {
+    const ant = Number(x.pct_anterior) || 0;
+    const atu = Number(x.pct) || 0;
+    const ehFoco = focoN && fn(x.partido) === focoN;
+    const linha = document.createElement('div');
+    linha.style.cssText = 'display:flex;align-items:center;margin:3px 0;gap:6px;' + (ehFoco ? 'background:' + corPartido(x.partido) + '1f;border-radius:6px;' : '');
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'width:96px;font-size:.72rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cinza);font-weight:' + (ehFoco ? '700' : 'normal') + ';';
+    lbl.textContent = (ehFoco ? '▶ ' : '') + x.partido;
+    const trilho = document.createElement('div');
+    trilho.style.cssText = 'flex:1;display:flex;gap:2px;height:14px;';
+    const bAnt = document.createElement('div');
+    bAnt.style.cssText = 'width:' + Math.max(0, Math.round((ant / max) * 100)) + '%;background:#cbd5e1;border-radius:3px;';
+    const bAtu = document.createElement('div');
+    bAtu.style.cssText = 'width:' + Math.max(0, Math.round((atu / max) * 100)) + '%;background:' + corPartido(x.partido) + ';border-radius:3px;';
+    trilho.append(bAnt, bAtu);
+    const val = document.createElement('div');
+    val.style.cssText = 'width:160px;font-size:.7rem;white-space:nowrap;color:' + (ehFoco ? 'var(--azul)' : 'var(--cinza)') + ';font-weight:' + (ehFoco ? '700' : 'normal') + ';';
+    let seta = '';
+    if (x.delta_pct != null) seta = (x.delta_pct > 0 ? ' ▲' : x.delta_pct < 0 ? ' ▼' : ' •') + (x.delta_pct > 0 ? '+' : '') + x.delta_pct + 'pts';
+    val.textContent = ant + '% → ' + atu + '%' + seta;
     linha.append(lbl, trilho, val);
     wrap.appendChild(linha);
   });
@@ -784,7 +858,7 @@ function renderDados(container, dados) {
       if (entradas.length) container.innerHTML = '<div class="kpi-grid">' + kpiHtml(entradas) + '</div>';
     }
     // gráfico colorido por partido (adversários no mesmo gráfico), destacando o foco
-    if (Array.isArray(dados.partidos) && dados.partidos.length) renderPartidosChart(container, dados.partidos, dados.foco);
+    if (Array.isArray(dados.partidos) && dados.partidos.length) renderPartidosChart(container, dados.partidos, dados.foco, escopoResultado(dados.filtro));
     // realça um eventual vencedor (ex: resultados eleitorais)
     if (dados.vencedor && typeof dados.vencedor === 'object') {
       const v = dados.vencedor;
@@ -804,10 +878,16 @@ function renderDados(container, dados) {
     // tendência de subida/queda de cada partido face ao processo anterior
     if (dados.tendencia && Array.isArray(dados.tendencia.evolucao) && dados.tendencia.evolucao.length) {
       const ev = dados.tendencia.evolucao;
+      const anoAnt = dados.tendencia.ano_anterior ?? 'anterior';
       const h = document.createElement('div');
       h.style.cssText = 'font-size:.85rem;font-weight:600;margin:12px 0 4px;';
-      h.textContent = '📈 Tendência por partido vs ' + (dados.tendencia.ano_anterior ?? 'anterior');
+      h.textContent = '📈 Tendência por partido' + (escopoResultado(dados.filtro) ? ' · ' + escopoResultado(dados.filtro) : '') + ' vs ' + anoAnt;
       container.appendChild(h);
+      renderTendenciaChart(container, ev, anoAnt, dados.foco);
+      const nota = document.createElement('div');
+      nota.style.cssText = 'font-size:.72rem;color:var(--cinza);margin:2px 0 6px;';
+      nota.textContent = 'Como ler: “Variação % (Delta pct)” = pontos percentuais de diferença; “Variação votos (Delta votos)” = diferença de votos. ▲ subiu · ▼ caiu vs ' + anoAnt + '.';
+      container.appendChild(nota);
       renderTabela(container, ev,
         ['Partido', 'Votos', '%', 'Votos anterior', '% anterior', 'Variação pts', 'Variação votos'],
         e => [
@@ -820,17 +900,30 @@ function renderDados(container, dados) {
           (e.delta_votos == null ? '—' : (e.delta_votos >= 0 ? '+' : '') + Number(e.delta_votos).toLocaleString('pt-MZ'))
         ], true, null, r => corLinhaFoco(r, dados.foco));
     }
-    // qualquer array de topo vira tabela (ex: partidos, provincias, por_provincia, lista)
+    // recomendações em tabela
+    if (dados.recomendacoes && Array.isArray(dados.recomendacoes.lista) && dados.recomendacoes.lista.length) {
+      const rc = dados.recomendacoes;
+      const hr = document.createElement('div');
+      hr.style.cssText = 'font-size:.85rem;font-weight:600;margin:12px 0 4px;';
+      hr.textContent = rc.titulo || '✅ Recomendações';
+      container.appendChild(hr);
+      renderTabela(container, rc.lista, ['Tema', 'Recomendação'],
+        r => [esc(String(r.tema || '')), esc(String(r.sugestao || ''))], false, null, r => corLinhaFoco(r, dados.foco));
+    }
+    // qualquer array de topo vira tabela (ex: partidos_analise, rivais_proximos, por_provincia)
     for (const chave of Object.keys(dados)) {
+      if (chave === 'partidos' || chave === 'evolucao') continue; // já ilustrados no gráfico/tendência
       const arr = dados[chave];
       if (Array.isArray(arr) && arr.length && typeof arr[0] === 'object') {
-        const chaves = Object.keys(arr[0]).filter(k => k !== 'id');
+        const DROP = chave === 'partidos_analise' ? ['pct_anterior', 'votos_anterior', 'delta_pct', 'delta_votos'] : [];
+        const chaves = Object.keys(arr[0]).filter(k => k !== 'id' && !DROP.includes(k));
         const h = document.createElement('div');
         h.style.cssText = 'font-size:.85rem;font-weight:600;margin:10px 0 4px;';
         h.textContent = cap(String(chave).replace(/_/g, ' '));
         container.appendChild(h);
-        renderTabela(container, arr, chaves.map(c => cap(String(c).replace(/_/g, ' '))),
-          r => chaves.map(c => esc(String(r[c] ?? ''))), false, null, r => corLinhaFoco(r, dados.foco));
+        const etiquetas = chaves.map(c => LABEL_STATSE[c] || cap(String(c).replace(/_/g, ' ')));
+        renderTabela(container, arr, etiquetas,
+          r => chaves.map(c => valTabelaStatse(c, r[c])), false, null, r => corLinhaFoco(r, dados.foco));
       }
     }
   }
