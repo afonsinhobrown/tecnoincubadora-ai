@@ -28,7 +28,7 @@ export const PROMPT_DDGEI = {
     fornecedores: 'fornecedores registados',
     funcionarios: 'funcionários registados',
     setores: 'setores da instituição',
-    movimentos: 'movimentos de equipamentos (entradas/saídas)',
+    movimentos: 'guias e movimentos de equipamentos (entradas/saídas), com filtro por mês',
     inventario_local: 'inventário de material por local/setor e por tipo de equipamento (equipamento, quantidade, estado)',
     processos_eleitorais: 'processos eleitorais (recenseamento, votação) e o seu estado',
     locais_armazenamento: 'locais de armazenamento de material eleitoral',
@@ -80,8 +80,8 @@ export const PROMPT_DDGEI = {
       id: 'movimentos',
       ferramenta: 'movimentos',
       titulo: '🔁 Movimentos',
-      frases: ['movimentos de equipamentos', 'entradas e saídas', 'últimos movimentos', 'movimentações'],
-      palavras: ['movimentos', 'movimentações', 'movimentacoes', 'entradas', 'saídas', 'saidas', 'movimento']
+      frases: ['movimentos de equipamentos', 'entradas e saídas', 'entradas e saidas', 'últimos movimentos', 'movimentações', 'guias de entrada e saída', 'guias de entrada e saida', 'guia de entrada', 'guia de saída'],
+      palavras: ['movimentos', 'movimentações', 'movimentacoes', 'entradas', 'entrada', 'saídas', 'saidas', 'saida', 'movimento', 'guias', 'guia']
     },
     {
       id: 'material_sobrante',

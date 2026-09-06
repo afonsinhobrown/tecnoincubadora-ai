@@ -118,16 +118,55 @@ async function setores() {
   return { totais: { setores: lista.length, novos_30d: 0 }, lista };
 }
 
-async function movimentos() {
+async function movimentos({ consulta } = {}) {
+  const conds = [];
+  const params = [];
+  const q = String(consulta || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const mesNome = MESES.find(m => q.includes(m));
+  if (mesNome) {
+    const ano = (q.match(/20\d{2}/) || [])[0] || String(new Date().getFullYear());
+    const mes = 1 + MESES.indexOf(mesNome);
+    const y = Number(ano);
+    const ini = `${y}-${String(mes).padStart(2, '0')}-01`;
+    const fim = mes === 12 ? `${y + 1}-01-01` : `${y}-${String(mes + 1).padStart(2, '0')}-01`;
+    params.push(ini, fim);
+    conds.push(`data >= $${params.length - 1} AND data < $${params.length}`);
+  }
+  const entradas = /\bentradas?\b/.test(q);
+  const saidas = /\bsaidas?\b/.test(q);
+  if (entradas || saidas) {
+    const tipos = [];
+    if (entradas) tipos.push('ENTRADA');
+    if (saidas) tipos.push('SAIDA');
+    params.push(tipos);
+    conds.push(`tipo = ANY($${params.length})`);
+  }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
   const lista = await sql(`
     SELECT id, guia, tipo, equipamento, coalesce(marca,'') AS marca,
            coalesce(numero_serie,'') AS numero_serie, data, coalesce(status,'') AS status,
            coalesce(motivo,'') AS motivo
     FROM movimentos
-    ORDER BY id DESC LIMIT 50
-  `);
-  const [totais] = await sql(`SELECT count(*)::int AS total, count(*) FILTER (WHERE tipo='ENTRADA')::int AS entradas, count(*) FILTER (WHERE tipo='SAIDA')::int AS saidas FROM movimentos`);
-  return { totais, lista };
+    ${where}
+    ORDER BY id DESC LIMIT 100
+  `, params);
+  const [totais] = await sql(`
+    SELECT count(*)::int AS total,
+           count(*) FILTER (WHERE tipo='ENTRADA')::int AS entradas,
+           count(*) FILTER (WHERE tipo='SAIDA')::int AS saidas
+    FROM movimentos
+    ${where}
+  `, params);
+  const filtro = {};
+  if (mesNome) filtro.mes = mesNome;
+  if (entradas || saidas) filtro.tipos = [entradas ? 'entradas' : null, saidas ? 'saidas' : null].filter(Boolean).join(' e ');
+  return {
+    totais,
+    pedido: (mesNome || entradas || saidas) ? 'especifico' : 'global',
+    filtro: Object.keys(filtro).length ? filtro : undefined,
+    lista
+  };
 }
 
 async function inventarioLocal({ consulta } = {}) {
@@ -341,7 +380,7 @@ export const FERRAMENTAS_DDGEI = {
   fornecedores: () => fornecedores(),
   funcionarios: (p = {}) => funcionarios(p),
   setores: () => setores(),
-  movimentos: () => movimentos(),
+  movimentos: (p = {}) => movimentos(p),
   inventario_local: (p = {}) => inventarioLocal(p),
   processos_eleitorais: () => processosEleitorais(),
   locais_armazenamento: () => locaisArmazenamento(),
