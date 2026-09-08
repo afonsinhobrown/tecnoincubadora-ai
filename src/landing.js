@@ -201,6 +201,14 @@ export const LANDING_HTML = `<!DOCTYPE html>
 <footer>TECNOINCUBADORA AI · TECNOINCUBADORA</footer>
 
 <script>
+(function () {
+  var h = window.location.hostname;
+  var isProd = h !== 'localhost' && h !== '127.0.0.1';
+  if (isProd) {
+    var noop = function () {};
+    console.log = console.warn = console.error = console.info = console.debug = console.trace = noop;
+  }
+})();
 let SISTEMA_ATUAL = null;      // sistema selecionado
 let ULTIMA_RESPOSTA = null;    // última resposta { blocos, produtos, sistema } p/ exportação
 let SESSAO = null;             // { usuario, farmacia } do login
